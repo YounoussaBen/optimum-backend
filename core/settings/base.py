@@ -46,6 +46,7 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
+    'drf_spectacular',
 ]
 
 # LOCAL_APPS = [
@@ -150,6 +151,7 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT Configuration
@@ -180,6 +182,16 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+}
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Optimum API',
+    'DESCRIPTION': 'API for user management, face-auth, transaction etc.',
+    'VERSION': '1.0.0',
+    # any other spectacular tweaks, e.g.:
+    # 'SERVE_INCLUDE_SCHEMA': False,
+    # 'COMPONENT_SPLIT_REQUEST': True,
 }
 
 # Azure Face API Configuration
