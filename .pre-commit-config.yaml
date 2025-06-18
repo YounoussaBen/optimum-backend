@@ -73,5 +73,6 @@ repos:
           - django-cors-headers
           - drf-spectacular
           - django-debug-toolbar
+          - psycopg[binary]
         args: [--ignore-missing-imports, --show-error-codes]
         files: '^(apps|core)/.*\.py$'

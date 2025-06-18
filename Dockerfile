@@ -1,76 +1,75 @@
-# Multi-stage Dockerfile for Django optimum application
+# syntax=docker/dockerfile:1.4
 
-# Stage 1: Build stage
-FROM python:3.12-slim as builder
+##########################################
+# Stage 1: Builder
+##########################################
+FROM python:3.10-slim AS builder
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 RUN pip install uv
 
-# Create app directory
+# Set workdir
 WORKDIR /app
 
-# Copy uv files
+# Copy project metadata
 COPY pyproject.toml uv.lock ./
 
-# Install Python dependencies
-RUN uv sync --frozen --no-dev
+# Install dependencies to system Python (alternative approach)
+RUN uv pip install --system -r pyproject.toml
 
-# Stage 2: Production stage
-FROM python:3.12-slim as production
+# Copy only necessary code for building packages
+COPY core core
+COPY apps apps
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    DJANGO_SETTINGS_MODULE=core.settings.prod \
-    PATH="/app/.venv/bin:$PATH"
+##########################################
+# Stage 2: Production
+##########################################
+FROM python:3.10-slim AS production
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libpq5 \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
+# Create user
 RUN groupadd -r django && useradd -r -g django django
 
-# Create app directory
+# Set workdir
 WORKDIR /app
 
-# Copy virtual environment from builder stage
-COPY --from=builder /app/.venv /app/.venv
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
+# Copy rest of the code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p /app/staticfiles /app/media /app/logs
+# Set correct permissions
+RUN mkdir -p /app/staticfiles /app/media /app/logs && \
+    chown -R django:django /app
 
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
-# Change ownership to django user
-RUN chown -R django:django /app
-
-# Switch to non-root user
+# Final user
 USER django
 
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health/')"
-
 # Default command
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--worker-class", "gthread", "--threads", "2", "--timeout", "120", "--keepalive", "5", "--max-requests", "1000", "--max-requests-jitter", "100", "optimum.wsgi:application"]
+CMD ["uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8000"]

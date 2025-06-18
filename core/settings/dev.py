@@ -2,9 +2,10 @@
 Django development settings for optimum project.
 """
 
+import importlib.util
 from datetime import timedelta
 
-from .base import *  # noqa: F403, F401
+from .base import *
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -13,38 +14,39 @@ DEBUG = True
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 # Database for development
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
-
 # DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': env('DB_NAME', default='optimum_dev'),
-#         'USER': env('DB_USER', default='postgres'),
-#         'PASSWORD': env('DB_PASSWORD', default='postgres'),
-#         'HOST': env('DB_HOST', default='localhost'),
-#         'PORT': env('DB_PORT', default='5432'),
+#     "default": {
+#         "ENGINE": "django.db.backends.sqlite3",
+#         "NAME": BASE_DIR / "db.sqlite3",
 #     }
 # }
 
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+    }
+}
+
+
 # Add debug toolbar for development
-INSTALLED_APPS += [
-    "debug_toolbar",
-]
+if importlib.util.find_spec("debug_toolbar"):
+    INSTALLED_APPS.append("debug_toolbar")
 
-MIDDLEWARE += [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
-]
+    # Debug toolbar middleware
+    MIDDLEWARE = [
+        "debug_toolbar.middleware.DebugToolbarMiddleware",
+    ] + MIDDLEWARE  # Add your existing middleware list here
 
-# Debug toolbar configuration
-INTERNAL_IPS = [
-    "127.0.0.1",
-    "localhost",
-]
+    # Debug toolbar settings
+    INTERNAL_IPS = [
+        "127.0.0.1",
+        "localhost",
+    ]
 
 # Email backend for development
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

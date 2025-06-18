@@ -4,7 +4,6 @@ name = "optimum-backend"
 version = "0.1.0"
 description = "Backend for OptimumIT platform"
 authors = [{ name = "Younoussa Ben", email = "younoussaabdourhaman@gmail.com" }]
-readme = "README.md"
 license = {text = "MIT"}
 dependencies = [
     "azure-storage-blob>=12.25.1",
@@ -107,7 +106,7 @@ known-first-party = ["core", "apps"]
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.10"
 check_untyped_defs = true
 ignore_missing_imports = true
 warn_unused_ignores = true

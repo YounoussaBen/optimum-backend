@@ -276,7 +276,7 @@ optimum-backend/
 
 ---
 
-## 🐳 Docker Support (Optional)
+## 🐳 Docker Support 
 
 ```bash
 # Build image
@@ -284,6 +284,9 @@ docker build -t optimum-backend .
 
 # Run with Docker Compose
 docker-compose up -d
+
+# Run only the development setup (optional)
+docker compose --profile dev up --build
 
 # View logs
 docker-compose logs -f web

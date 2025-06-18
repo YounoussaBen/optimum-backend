@@ -209,7 +209,6 @@ coverage.xml
 
 # uv
 .uv/
-uv.lock
 
 # Local configuration
 local_settings.py
