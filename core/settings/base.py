@@ -116,7 +116,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 #     }
 
 # Custom User Model
-# AUTH_USER_MODEL = "users.User"
+AUTH_USER_MODEL = "users.User"
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

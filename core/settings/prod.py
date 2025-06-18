@@ -128,18 +128,13 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
-            "style": "{",
-        },
         "json": {
-            "format": '{"level": "{levelname}", "time": "{asctime}", "module": "{module}", "message": "{message}"}',
-            "style": "{",
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
         },
     },
     "handlers": {
         "console": {
-            "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "json",
         },

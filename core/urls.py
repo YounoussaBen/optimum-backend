@@ -11,7 +11,17 @@ from drf_spectacular.views import (
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.routers import DefaultRouter
+
+
+class ProtectedSwaggerView(SpectacularSwaggerView):
+    permission_classes = [IsAuthenticated]
+
+
+class ProtectedRedocView(SpectacularRedocView):
+    permission_classes = [IsAuthenticated]
+
 
 # Create a router for API endpoints
 router = DefaultRouter()
@@ -28,10 +38,10 @@ urlpatterns = [
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",
-        SpectacularSwaggerView.as_view(url_name="schema"),
+        ProtectedSwaggerView.as_view(url_name="schema"),
         name="swagger-ui",
     ),
-    path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    path("api/redoc/", ProtectedRedocView.as_view(url_name="schema"), name="redoc"),
     # Health check endpoint
     path("health/", include("core.health_urls")),
 ]
