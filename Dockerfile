@@ -33,7 +33,7 @@ FROM python:3.12-slim as production
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DJANGO_SETTINGS_MODULE=optimum.settings.prod \
+    DJANGO_SETTINGS_MODULE=core.settings.prod \
     PATH="/app/.venv/bin:$PATH"
 
 # Install system dependencies

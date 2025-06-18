@@ -40,7 +40,7 @@ uv sync
 
 ## 🔒 Environment Variables
 
-Create a `.env` file or set environment variables manually. Use [`django-environ`](https://github.com/joke2k/django-environ).
+Create a `.env` file or set environment variables manually. Use `python-dotenv`
 
 Example:
 
@@ -117,4 +117,3 @@ docker-compose up
 ## 📄 License
 
 MIT © [Younoussa Ben](mailto:younoussaabdourhaman@gmail.com)
-
