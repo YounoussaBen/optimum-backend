@@ -15,6 +15,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Load environment variables from .env file
 load_dotenv(BASE_DIR / ".env")
 
+# Create logs directory if it doesn't exist - MOVED UP BEFORE LOGGING CONFIG
+os.makedirs(BASE_DIR / "logs", exist_ok=True)
+
 
 # Helper function to get environment variables with defaults
 def get_env(key: str, default: Any = None, cast: type | None = None) -> Any:
@@ -251,22 +254,19 @@ LOGGING = {
         },
     },
     "root": {
-        "handlers": ["file"],
+        "handlers": ["console"],
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["file"],
+            "handlers": ["console", "file"],
             "level": "INFO",
             "propagate": False,
         },
         "apps": {
-            "handlers": ["file"],
+            "handlers": ["console", "file"],
             "level": "DEBUG",
             "propagate": False,
         },
     },
 }
-
-# Create logs directory if it doesn't exist
-os.makedirs(BASE_DIR / "logs", exist_ok=True)

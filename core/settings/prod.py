@@ -14,7 +14,9 @@ DEBUG = False
 
 # Production allowed hosts - will be set via environment variables
 ALLOWED_HOSTS = (
-    os.getenv("ALLOWED_HOSTS", "").split(",") if os.getenv("ALLOWED_HOSTS") else []
+    os.getenv("ALLOWED_HOSTS", "").split(",")
+    if os.getenv("ALLOWED_HOSTS")
+    else ["optimum-backend.onrender.com"]
 )
 
 # Production database configuration
@@ -128,21 +130,15 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "json": {
-            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
-            "class": "pythonjsonlogger.jsonlogger.JsonFormatter",
+        "simple": {
+            "format": "[{levelname}] {asctime} {name}: {message}",
+            "style": "{",
         },
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "formatter": "json",
-        },
-        "file": {
-            "level": "ERROR",
-            "class": "logging.FileHandler",
-            "filename": "/tmp/django_errors.log",
-            "formatter": "verbose",
+            "formatter": "simple",
         },
     },
     "root": {
@@ -151,18 +147,8 @@ LOGGING = {
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
-            "propagate": False,
-        },
-        "apps": {
-            "handlers": ["console", "file"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "django.security": {
-            "handlers": ["console", "file"],
-            "level": "WARNING",
             "propagate": False,
         },
     },
