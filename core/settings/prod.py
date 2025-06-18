@@ -50,12 +50,11 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv("AZURE_POSTGRESQL_NAME") or os.getenv("DB_NAME"),
-            "USER": os.getenv("AZURE_POSTGRESQL_USER") or os.getenv("DB_USER"),
-            "PASSWORD": os.getenv("AZURE_POSTGRESQL_PASSWORD")
-            or os.getenv("DB_PASSWORD"),
-            "HOST": os.getenv("AZURE_POSTGRESQL_HOST") or os.getenv("DB_HOST"),
-            "PORT": os.getenv("AZURE_POSTGRESQL_PORT") or os.getenv("DB_PORT", "5432"),
+            "NAME": os.getenv("DB_NAME"),
+            "USER": os.getenv("DB_USER"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST"),
+            "PORT": os.getenv("DB_PORT", "5432"),
             "OPTIONS": {
                 "sslmode": "require",
             },
