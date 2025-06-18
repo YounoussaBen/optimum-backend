@@ -21,7 +21,9 @@ def get_env(key: str, default: Any = None, cast: type | None = None) -> Any:
     value = os.getenv(key, default)
     if cast and value is not None:
         if cast is bool:  # Use 'is' for type comparison
-            return value.lower() in ("true", "1", "yes", "on")
+            if isinstance(value, bool):
+                return value
+            return str(value).lower() in ("true", "1", "yes", "on")
         elif cast is list:  # Use 'is' for type comparison
             return [item.strip() for item in value.split(",") if item.strip()]
         else:
