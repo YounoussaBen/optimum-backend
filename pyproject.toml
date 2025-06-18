@@ -1,0 +1,151 @@
+[project]
+name = "optimum-backend"
+version = "0.1.0"
+description = "Backend for OptimumIT platform"
+authors = [{ name = "Younoussa Ben", email = "younoussaabdourhaman@gmail.com" }]
+readme = "README.md"
+license = {text = "MIT"}
+dependencies = [
+    "azure-storage-blob>=12.25.1",
+    "dj-database-url>=3.0.0",
+    "django>=5.2.3",
+    "django-cors-headers>=4.7.0",
+    "django-environ>=0.12.0",
+    "djangorestframework>=3.16.0",
+    "djangorestframework-simplejwt>=5.5.0",
+    "drf-spectacular>=0.28.0",
+    "gunicorn>=23.0.0",
+    "pillow>=11.2.1",
+    "psycopg[binary]>=3.2.9",
+    "python-decouple>=3.8",
+    "requests>=2.32.4",
+    "whitenoise>=6.9.0",
+]
+
+[tool.uv]  # Needed so uv knows this is a uv-managed project
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "django-debug-toolbar>=5.2.0",
+    "factory-boy>=3.3.3",
+    "pre-commit>=4.2.0",
+    "pytest-cov>=6.2.1",
+    "pytest-django>=4.11.1",
+    "ruff>=0.12.0",
+    "mypy>=1.6.0",
+    "django-stubs>=4.2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    migrations
+    | venv
+    | \.env
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+)/
+'''
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+]
+exclude = [
+    "migrations",
+    "venv",
+    ".env",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+"settings/*.py" = ["F405", "F403"]
+
+[tool.ruff.isort]
+known-first-party = ["optimum", "apps"]
+known-django = ["django"]
+section-order = ["future", "standard-library", "django", "third-party", "first-party", "local-folder"]
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = ["mypy_django_plugin.main"]
+
+[tool.django-stubs]
+django_settings_module = "optimum.settings.dev"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "optimum.settings.dev"
+addopts = "--cov=apps --cov-report=html --cov-report=term-missing --cov-fail-under=80"
+testpaths = ["tests", "apps"]
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+
+[tool.coverage.run]
+source = ["apps"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/venv/*",
+    "manage.py",
+    "*/settings/*",
+    "*/wsgi.py",
+    "*/asgi.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["apps", "core", "test"]
