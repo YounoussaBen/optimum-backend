@@ -18,14 +18,21 @@ load_dotenv(BASE_DIR / ".env")
 
 # Helper function to get environment variables with defaults
 def get_env(key: str, default: Any = None, cast: type | None = None) -> Any:
-    value = os.getenv(key, default)
+    value = os.getenv(key)
+    if value is None:
+        value = default
+
     if cast and value is not None:
-        if cast is bool:  # Use 'is' for type comparison
+        if cast is bool:
             if isinstance(value, bool):
                 return value
             return str(value).lower() in ("true", "1", "yes", "on")
-        elif cast is list:  # Use 'is' for type comparison
-            return [item.strip() for item in value.split(",") if item.strip()]
+        elif cast is list:
+            if isinstance(value, list):
+                return value
+            if isinstance(value, str):
+                return [item.strip() for item in value.split(",") if item.strip()]
+            return default  # fallback if value can't be cast
         else:
             return cast(value)
     return value
@@ -109,7 +116,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 #     }
 
 # Custom User Model
-# AUTH_USER_MODEL = 'users.User'
+# AUTH_USER_MODEL = "users.User"
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
