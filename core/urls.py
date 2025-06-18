@@ -18,7 +18,6 @@ urlpatterns = [
     
     # API endpoints
     # path('api/', include('apps.users.urls')),
-    # path('api/', include('apps.financial.urls')),
     # path('api/', include('apps.face_auth.urls')),
     
     # DRF router

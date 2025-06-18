@@ -18,7 +18,7 @@ env = environ.Env(
     DATABASE_URL=(str, ''),
     AZURE_FACE_API_KEY=(str, ''),
     AZURE_FACE_ENDPOINT=(str, ''),
-    AZURE_FACE_PERSON_GROUP_ID=(str, 'financial-app-users'),
+    AZURE_FACE_PERSON_GROUP_ID=(str, 'optimum-app-users'),
 )
 
 # Take environment variables from .env file
@@ -49,13 +49,12 @@ THIRD_PARTY_APPS = [
     'drf_spectacular',
 ]
 
-# LOCAL_APPS = [
-#     'apps.users',
-#     'apps.financial',
-#     'apps.face_auth',
-# ]
+LOCAL_APPS = [
+    'apps.users',
+    # 'apps.face_auth',
+]
 
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
