@@ -1,30 +1,30 @@
 #!/bin/bash
+# render_deploy.sh - Complete deployment script for Render
 
-# Exit on any error
-set -e
+set -e  # Exit on any error
 
 echo "Starting Django application on Render..."
 
-# Run database migrations
+# Create necessary directories
+mkdir -p /app/static
+mkdir -p /app/staticfiles
+
 echo "Running migrations..."
 python manage.py migrate --noinput
 
-# Collect static files
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Create superuser if it doesn't exist
-echo "Creating superuser..."
-python manage.py shell -c "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'test@admin.com', '1234')
-    print('Superuser created')
-else:
-    print('Superuser already exists')
-"
+echo "Creating superuser if needed..."
+# Use the custom management command instead of shell
+python manage.py create_superuser
 
-# Start the application
-echo "Starting server..."
-exec gunicorn --bind 0.0.0.0:$PORT core.wsgi:application --workers 2
+echo "Starting Gunicorn server..."
+exec gunicorn core.wsgi:application \
+    --bind 0.0.0.0:$PORT \
+    --workers 3 \
+    --timeout 60 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
+    --access-logfile - \
+    --error-logfile -
