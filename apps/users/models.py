@@ -104,6 +104,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=False, help_text="Whether user has been verified by admin"
     )
 
+    verification_expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When face verification expires and user needs to re-verify",
+    )
+
     is_staff = models.BooleanField(
         default=False, help_text="Designates whether the user can access the admin site"
     )
@@ -178,3 +184,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     def can_authenticate(self):
         """Check if user can authenticate (active, verified, face registered)."""
         return self.is_active and self.is_verified and self.is_face_registered
+
+    @property
+    def is_verification_expired(self):
+        """Check if face verification has expired."""
+        if not self.verification_expires_at:
+            return (
+                not self.is_verified
+            )  # If no expiration set, rely on is_verified only
+        return timezone.now() > self.verification_expires_at
+
+    def expire_verification(self):
+        """Manually expire user's verification."""
+        self.is_verified = False
+        self.verification_expires_at = None
+        self.save(update_fields=["is_verified", "verification_expires_at"])

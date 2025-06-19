@@ -81,9 +81,14 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.users.middleware.FaceVerificationExpirationMiddleware",  # Add this line
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+FACE_VERIFICATION_DURATION_MINUTES = get_env(
+    "FACE_VERIFICATION_DURATION_MINUTES", 60, int
+)
 
 ROOT_URLCONF = "core.urls"
 

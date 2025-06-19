@@ -71,6 +71,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "face_status",
             "is_active",
             "is_verified",
+            "verification_expires_at",
             "can_authenticate",
             "date_joined",
             "updated_at",
@@ -80,6 +81,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "unique_pin_identifier",
             "person_id",
             "face_added",
+            "verification_expires_at",
             "date_joined",
             "updated_at",
         ]
@@ -187,6 +189,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "gender",
             "is_active",
             "is_verified",
+            "verification_expires_at",
         ]
 
     def validate_email(self, value: str) -> str:

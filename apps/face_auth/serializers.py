@@ -122,6 +122,18 @@ class FaceAuthenticationSerializer(serializers.Serializer):
         ],
         help_text="8 or 9-digit PIN identifier",
     )
+    person_group_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        validators=[
+            RegexValidator(
+                regex=r"^[a-z0-9-_]+$",
+                message="Person group ID can only contain lowercase letters, numbers, hyphens, and underscores.",
+            )
+        ],
+        help_text="Optional person group ID. Uses default if not provided.",
+    )
 
     image_url = serializers.URLField(
         required=False, allow_blank=True, help_text="URL of the face image"
@@ -222,6 +234,19 @@ class FaceVerificationSerializer(serializers.Serializer):
         help_text="User ID to verify. If not provided, uses current authenticated user.",
     )
 
+    person_group_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        validators=[
+            RegexValidator(
+                regex=r"^[a-z0-9-_]+$",
+                message="Person group ID can only contain lowercase letters, numbers, hyphens, and underscores.",
+            )
+        ],
+        help_text="Optional person group ID. Uses default if not provided.",
+    )
+
     image_url = serializers.URLField(
         required=False, allow_blank=True, help_text="URL of the face image"
     )
@@ -235,7 +260,7 @@ class FaceVerificationSerializer(serializers.Serializer):
     )
 
     confidence_threshold = serializers.FloatField(
-        default=0.8,
+        default=0.7,
         min_value=0.0,
         max_value=1.0,
         help_text="Minimum confidence score for successful verification (0.0-1.0)",
@@ -306,6 +331,7 @@ class FaceVerificationResponseSerializer(serializers.Serializer):
     confidence_score = serializers.FloatField(required=False)
     message = serializers.CharField()
     user_id = serializers.UUIDField(required=False)
+    expires_at = serializers.DateTimeField(required=False)
 
 
 class AddUserFaceSerializer(serializers.Serializer):

@@ -6,9 +6,12 @@ Implements Azure Face API integration with proper error handling and logging.
 
 import base64
 import logging
+from datetime import timedelta
 from typing import Any
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from drf_yasg import openapi
@@ -544,7 +547,7 @@ class FaceAuthenticationView(CreateAPIView):
             404: "Not Found - User not found",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Authentication"],
+        tags=["Authentication & Verification"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -558,16 +561,18 @@ class FaceAuthenticationView(CreateAPIView):
         confidence_threshold = serializer.validated_data.get(
             "confidence_threshold", 0.7
         )
+        person_group_id = serializer.validated_data.get(
+            "person_group_id"
+        )  # Add this line
 
         try:
             # Get user by PIN
-            try:
-                user = User.objects.get(unique_pin_identifier=pin, is_active=True)
-            except User.DoesNotExist:
+            user = User.objects.get_by_pin(pin)
+            if not user or not user.is_active:
                 logger.warning(f"Authentication failed: Invalid PIN {pin}")
                 return Response(
-                    {"success": False, "message": "Invalid PIN or user not found"},
-                    status=status.HTTP_404_NOT_FOUND,
+                    {"success": False, "message": "Invalid credentials"},
+                    status=status.HTTP_401_UNAUTHORIZED,
                 )
 
             # Check if user has face registered
@@ -580,7 +585,7 @@ class FaceAuthenticationView(CreateAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Prepare image data for Azure Face API
+            # Prepare image data
             image_data = self._prepare_image_data(serializer.validated_data)
 
             # Initialize Azure Face Service
@@ -604,9 +609,11 @@ class FaceAuthenticationView(CreateAPIView):
             # Use the first detected face
             face_id = detected_faces[0]["faceId"]
 
-            # Verify face against user's person in Azure
+            # Verify face against user's person in Azure (with optional person group)
             verification_result = azure_service.verify_face(
-                face_id=face_id, person_id=user.person_id
+                face_id=face_id,
+                person_id=user.person_id,
+                person_group_id=person_group_id,  # Add this line
             )
 
             is_identical = verification_result.get("isIdentical", False)
@@ -701,7 +708,7 @@ class FaceVerificationView(CreateAPIView):
             403: "Forbidden - Cannot verify other users",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["User Operations"],
+        tags=["Authentication & Verification"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -713,6 +720,13 @@ class FaceVerificationView(CreateAPIView):
 
         # Determine which user to verify
         target_user_id = serializer.validated_data.get("user_id")
+        person_group_id = serializer.validated_data.get(
+            "person_group_id"
+        )  # Add this line
+        confidence_threshold = serializer.validated_data.get(
+            "confidence_threshold", 0.8
+        )
+
         if target_user_id:
             # Only admin can verify other users
             if not request.user.is_staff:
@@ -732,10 +746,6 @@ class FaceVerificationView(CreateAPIView):
                 )
         else:
             target_user = request.user
-
-        confidence_threshold = serializer.validated_data.get(
-            "confidence_threshold", 0.8
-        )
 
         try:
             # Check if user has face registered
@@ -780,25 +790,55 @@ class FaceVerificationView(CreateAPIView):
             # Use the first detected face
             face_id = detected_faces[0]["faceId"]
 
-            # Verify face against user's person in Azure
+            # Verify face against user's person in Azure (with optional person group)
             verification_result = azure_service.verify_face(
-                face_id=face_id, person_id=target_user.person_id
+                face_id=face_id,
+                person_id=target_user.person_id,
+                person_group_id=person_group_id,  # Add this line
             )
 
             is_identical = verification_result.get("isIdentical", False)
             confidence = verification_result.get("confidence", 0.0)
 
             if is_identical and confidence >= confidence_threshold:
-                logger.info(
-                    f"Successful face verification for user {target_user.id} "
-                    f"(confidence: {confidence:.3f})"
-                )
+                # Set verification status and expiration for face verification API only
+                # (not for manual admin verification)
+                if not request.user.is_staff:  # Only for normal users, not admin
+                    target_user.is_verified = True
+
+                    # Set verification expiration time
+                    verification_duration = getattr(
+                        settings, "FACE_VERIFICATION_DURATION_MINUTES", 60
+                    )
+                    target_user.verification_expires_at = timezone.now() + timedelta(
+                        minutes=verification_duration
+                    )
+
+                    target_user.save(
+                        update_fields=["is_verified", "verification_expires_at"]
+                    )
+
+                    logger.info(
+                        f"Face verification successful for user {target_user.id} "
+                        f"(confidence: {confidence:.3f}, expires at: {target_user.verification_expires_at})"
+                    )
+                else:
+                    logger.info(
+                        f"Face verification successful for admin user {target_user.id} "
+                        f"(confidence: {confidence:.3f}, no expiration set)"
+                    )
+
                 return Response(
                     {
                         "verified": True,
                         "user_id": target_user.id,
                         "confidence_score": confidence,
                         "message": "Identity verified successfully",
+                        "expires_at": (
+                            target_user.verification_expires_at.isoformat()
+                            if target_user.verification_expires_at
+                            else None
+                        ),
                     },
                     status=status.HTTP_200_OK,
                 )

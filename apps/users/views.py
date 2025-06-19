@@ -145,7 +145,7 @@ class UserDeleteView(DestroyAPIView):
             404: "Not Found - User not found",
             500: "Internal Server Error - Cleanup failed",
         },
-        tags=["Admin - User Management"],
+        tags=["User Management"],
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
@@ -263,7 +263,7 @@ class UserProfileView(RetrieveAPIView):
     @swagger_auto_schema(
         operation_summary="Get current user profile",
         operation_description="Retrieve the current authenticated user's profile information.",
-        tags=["User Profile"],
+        tags=["User Management"],
     )
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
