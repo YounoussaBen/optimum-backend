@@ -63,7 +63,7 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
-    "drf_spectacular",
+    "drf_yasg",
 ]
 
 LOCAL_APPS = [
@@ -178,7 +178,6 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 SIMPLE_JWT = {
@@ -208,13 +207,14 @@ SIMPLE_JWT = {
     "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
 }
 
-SPECTACULAR_SETTINGS = {
-    "TITLE": "Optimum API",
-    "DESCRIPTION": "API for user management, face-auth, transaction etc.",
-    "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,
-    "COMPONENT_SPLIT_REQUEST": True,
+# swagger
+# https://drf-yasg.readthedocs.io/en/stable/readme.html
+SWAGGER_SETTINGS = {
+    "SECURITY_DEFINITIONS": {
+        "Bearer": {"type": "apiKey", "name": "Authorization", "in": "header"},
+    },
 }
+
 
 # Azure Face API Configuration
 AZURE_FACE_API_KEY = get_env("AZURE_FACE_API_KEY", "")

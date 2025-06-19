@@ -221,7 +221,6 @@ class UserUpdateSerializer(serializers.ModelSerializer):
                     "A user with this phone number already exists."
                 )
         return value
-        return value
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -245,7 +244,16 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "is_verified",
             "date_joined",
         ]
-        read_only_fields = "__all__"  # All fields are read-only
+        read_only_fields = [
+            "id",
+            "email",
+            "full_name",
+            "phone_number",
+            "unique_pin_identifier",
+            "face_status",
+            "is_verified",
+            "date_joined",
+        ]
 
     def get_face_status(self, obj: Any) -> dict[str, Any]:
         """Return face registration status for user."""

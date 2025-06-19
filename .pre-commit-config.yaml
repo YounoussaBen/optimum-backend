@@ -71,7 +71,7 @@ repos:
           - djangorestframework
           - djangorestframework-simplejwt
           - django-cors-headers
-          - drf-spectacular
+          - drf_yasg
           - django-debug-toolbar
           - psycopg[binary]
         args: [--ignore-missing-imports, --show-error-codes]
