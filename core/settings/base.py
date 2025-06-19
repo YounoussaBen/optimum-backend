@@ -68,7 +68,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "apps.users",
-    # 'apps.face_auth',
+    "apps.face_auth",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -219,7 +219,7 @@ SWAGGER_SETTINGS = {
 # Azure Face API Configuration
 AZURE_FACE_API_KEY = get_env("AZURE_FACE_API_KEY", "")
 AZURE_FACE_ENDPOINT = get_env("AZURE_FACE_ENDPOINT", "")
-AZURE_FACE_PERSON_GROUP_ID = get_env("AZURE_FACE_PERSON_GROUP_ID", "optimum-app-users")
+AZURE_FACE_PERSON_GROUP_ID = get_env("AZURE_FACE_PERSON_GROUP_ID", "optimum")
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = [
@@ -251,23 +251,23 @@ LOGGING = {
             "formatter": "verbose",
         },
         "console": {
-            "level": "INFO",
+            "level": "DEBUG",
             "class": "logging.StreamHandler",
             "formatter": "simple",
         },
     },
     "root": {
-        "handlers": ["console"],
+        "handlers": [],
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["file"],
             "level": "INFO",
             "propagate": False,
         },
         "apps": {
-            "handlers": ["console", "file"],
+            "handlers": ["file"],
             "level": "DEBUG",
             "propagate": False,
         },

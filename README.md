@@ -4,6 +4,40 @@ Backend API for the **OptimumIT platform** — built with Django and Django REST
 
 ---
 
+## 🔄 Workflow
+
+### Face Recognition Setup Workflow
+
+Follow these steps in order to set up face recognition:
+
+```bash
+# 1. Create person group
+POST /api/admin/person-groups/create/
+
+# 2. Create user
+POST /api/users/create/
+
+# 3. Add user to person group (creates Azure person)  
+POST /api/admin/users/add-to-group/
+
+# 4. Add face(s) to user
+POST /api/admin/users/add-face/
+
+# 5. 🚨 CRITICAL: Train the person group
+POST /api/admin/person-groups/train/
+
+# 6. Check training status (wait for "succeeded")
+GET /api/admin/person-groups/training-status/
+
+# 7. NOW you can authenticate/verify
+POST /api/auth/face-login/
+POST /api/auth/verify/
+```
+
+**⚠️ Important**: Training the person group (step 5) is mandatory before authentication will work. Always check training status before proceeding to authentication.
+
+---
+
 ## 🚀 Tech Stack
 
 - **Django 5.2+** - Web framework
@@ -46,7 +80,7 @@ ALLOWED_HOSTS=localhost,127.0.0.1
 # Azure Face API (optional for development)
 AZURE_FACE_API_KEY=your-azure-face-api-key
 AZURE_FACE_ENDPOINT=https://your-region.api.cognitive.microsoft.com/face/v1.0/
-AZURE_FACE_PERSON_GROUP_ID=optimum-app-users
+AZURE_FACE_PERSON_GROUP_ID=optimum
 ```
 
 ### 3. Database Setup
