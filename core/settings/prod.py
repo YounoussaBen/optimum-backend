@@ -93,24 +93,24 @@ CORS_ALLOWED_ORIGINS = (
 )
 
 # Production cache configuration (Redis on Azure)
-# if "AZURE_REDIS_CONNECTIONSTRING" in os.environ:
-#     redis_url = os.environ["AZURE_REDIS_CONNECTIONSTRING"]
-#     CACHES = {
-#         "default": {
-#             "BACKEND": "django_redis.cache.RedisCache",
-#             "LOCATION": redis_url,
-#             "OPTIONS": {
-#                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
-#             },
-#         }
-#     }
-# else:
-#     CACHES = {
-#         "default": {
-#             "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-#             "LOCATION": "cache_table",
-#         }
-#     }
+if "AZURE_REDIS_CONNECTIONSTRING" in os.environ:
+    redis_url = os.environ["AZURE_REDIS_CONNECTIONSTRING"]
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": redis_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "cache_table",
+        }
+    }
 
 # Session configuration
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"

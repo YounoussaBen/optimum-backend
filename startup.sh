@@ -19,6 +19,8 @@ echo "Creating superuser if needed..."
 # Use the custom management command instead of shell
 python manage.py create_superuser
 
+python manage.py createcachetable
+
 echo "Starting Gunicorn server..."
 exec gunicorn core.wsgi:application \
     --bind 0.0.0.0:$PORT \
