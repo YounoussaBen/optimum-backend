@@ -57,6 +57,7 @@ DJANGO_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework_simplejwt.token_blacklist",
 ]
 
 THIRD_PARTY_APPS = [
@@ -226,12 +227,12 @@ AZURE_FACE_API_KEY = get_env("AZURE_FACE_API_KEY", "")
 AZURE_FACE_ENDPOINT = get_env("AZURE_FACE_ENDPOINT", "")
 AZURE_FACE_PERSON_GROUP_ID = get_env("AZURE_FACE_PERSON_GROUP_ID", "optimum")
 
-# CORS Configuration
+# CORS settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://optimum.vercel.app",
 ]
-
 CORS_ALLOW_CREDENTIALS = True
 
 # Logging Configuration

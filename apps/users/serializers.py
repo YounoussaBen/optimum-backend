@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Any
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 
 User = get_user_model()
@@ -264,3 +264,78 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "registered": obj.is_face_registered,
             "can_authenticate": obj.can_authenticate,
         }
+
+
+class AdminLoginSerializer(serializers.Serializer):
+    """
+    Serializer for admin email/password authentication.
+    Only allows staff/superuser accounts to login.
+    """
+
+    email = serializers.EmailField()
+    password = serializers.CharField(
+        style={"input_type": "password"}, trim_whitespace=False
+    )
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+
+        if email and password:
+            # Authenticate user
+            user = authenticate(
+                request=self.context.get("request"),
+                username=email,  # User model uses email as USERNAME_FIELD
+                password=password,
+            )
+
+            if not user:
+                raise serializers.ValidationError(
+                    "Invalid email or password.", code="authorization"
+                )
+
+            if not user.is_active:
+                raise serializers.ValidationError(
+                    "User account is disabled.", code="authorization"
+                )
+
+            # Check if user is staff or superuser
+            if not (user.is_staff or user.is_superuser):
+                raise serializers.ValidationError(
+                    "Access denied. Admin privileges required.", code="authorization"
+                )
+
+            attrs["user"] = user
+            return attrs
+        else:
+            raise serializers.ValidationError(
+                "Must include email and password.", code="authorization"
+            )
+
+
+class AdminLoginResponseSerializer(serializers.Serializer):
+    """
+    Serializer for admin login response.
+    """
+
+    access_token = serializers.CharField()
+    refresh_token = serializers.CharField()
+    user = serializers.SerializerMethodField()
+
+    def get_user(self, obj):
+        user = obj["user"]
+        return {
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.get_full_name(),
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
+        }
+
+
+class TokenRefreshResponseSerializer(serializers.Serializer):
+    """
+    Serializer for token refresh response.
+    """
+
+    access_token = serializers.CharField()

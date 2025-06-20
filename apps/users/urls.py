@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from .admin_auth_views import AdminLoginView, AdminLogoutView, TokenRefreshView
 
 # App namespace
 app_name = "users"
@@ -16,6 +17,9 @@ patterns = [
     path("users/by-pin/<str:pin>/", views.UserByPinView.as_view(), name="user-by-pin"),
     # User profile endpoint
     path("profile/", views.UserProfileView.as_view(), name="user-profile"),
+    path("admin/login/", AdminLoginView.as_view(), name="admin-login"),
+    path("admin/logout/", AdminLogoutView.as_view(), name="admin-logout"),
+    path("admin/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
 ]
 
 urlpatterns = patterns
