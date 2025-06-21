@@ -55,9 +55,9 @@ urlpatterns = [
     ),
     # User Management (Admin only)
     path(
-        "admin/users/add-to-group/",
+        "users/add-to-group/",
         AddUserToPersonGroupView.as_view(),
         name="user-add-to-group",
     ),
-    path("admin/users/add-face/", AddUserFaceView.as_view(), name="user-add-face"),
+    path("users/add-face/", AddUserFaceView.as_view(), name="user-add-face"),
 ]
