@@ -10,7 +10,7 @@ from rest_framework.generics import (
     RetrieveAPIView,
     UpdateAPIView,
 )
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .permissions import IsAdminUser
@@ -33,18 +33,23 @@ class UserListView(ListAPIView):
     """
     API view to list all users.
     Only accessible by admin users.
+    Returns only non-staff and non-admin users.
     """
 
-    queryset = User.objects.all().order_by("-date_joined")
     serializer_class = UserListSerializer
     permission_classes = [IsAuthenticated, IsAdminUser]
     search_fields = ["email", "first_name", "last_name", "phone_number"]
     filterset_fields = ["is_active", "is_verified", "face_added"]
     ordering_fields = ["date_joined", "email", "first_name", "last_name"]
 
+    def get_queryset(self):
+        return User.objects.filter(is_staff=False, is_superuser=False).order_by(
+            "-date_joined"
+        )
+
     @swagger_auto_schema(
         operation_summary="List all users",
-        operation_description="Retrieve a list of all users. Admin access required.",
+        operation_description="Retrieve a list of all non-staff and non-admin users. Admin access required.",
         tags=["User Management"],
     )
     def get(self, request, *args, **kwargs):
@@ -277,17 +282,17 @@ class UserByPinView(RetrieveAPIView):
     """
     API view to retrieve user by PIN.
     Useful for face authentication flow.
-    Only accessible by admin users.
+    No authentication required.
     """
 
     serializer_class = UserDetailSerializer
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [AllowAny]
     lookup_field = "unique_pin_identifier"
     lookup_url_kwarg = "pin"
 
     @swagger_auto_schema(
         operation_summary="Get user by PIN",
-        operation_description="Retrieve user information using PIN identifier. Admin access required.",
+        operation_description="Retrieve user information using PIN identifier. No authentication required.",
         tags=["User Management"],
     )
     def get(self, request, *args, **kwargs):
