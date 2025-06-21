@@ -24,12 +24,13 @@ class UserListSerializer(serializers.ModelSerializer):
             "full_name",
             "phone_number",
             "unique_pin_identifier",
+            "person_id",
             "face_status",
             "is_active",
             "is_verified",
             "date_joined",
         ]
-        read_only_fields = ["id", "unique_pin_identifier", "date_joined"]
+        read_only_fields = ["id", "unique_pin_identifier", "date_joined", "person_id"]
 
     def get_face_status(self, obj: Any) -> str:
         """Return face registration status."""
