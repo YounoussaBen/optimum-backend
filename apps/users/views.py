@@ -1,6 +1,10 @@
 import logging
+import uuid
+from datetime import datetime, timedelta
+from typing import Any, cast
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import (
@@ -12,9 +16,11 @@ from rest_framework.generics import (
 )
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .permissions import IsAdminUser
 from .serializers import (
+    DashboardDataSerializer,
     UserCreateSerializer,
     UserDetailSerializer,
     UserListSerializer,
@@ -300,3 +306,183 @@ class UserByPinView(RetrieveAPIView):
 
     def get_queryset(self):
         return User.objects.all()
+
+
+class DashboardStatsView(APIView):
+    """
+    API view to get dashboard statistics and data.
+    Only accessible by admin users.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    @swagger_auto_schema(
+        operation_summary="Get dashboard statistics",
+        operation_description="Retrieve dashboard statistics including user counts, verification data, and recent activities. Admin access required.",
+        responses={
+            200: DashboardDataSerializer,
+            401: "Unauthorized - Admin access required",
+        },
+        tags=["Dashboard"],
+    )
+    def get(self, request, *args, **kwargs):
+        """Get complete dashboard data."""
+        dashboard_data = {
+            "stats": self._get_dashboard_stats(),
+            "verification_chart": self._get_verification_chart_data(),
+            "recent_activities": self._get_recent_activities(),
+        }
+
+        serializer = DashboardDataSerializer(dashboard_data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _get_dashboard_stats(self) -> dict[str, Any]:
+        """Calculate dashboard statistics from real data."""
+        now = timezone.now()
+        current_month_start = now.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        last_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
+
+        # Get current stats (non-staff users only)
+        current_total = User.objects.filter(is_staff=False, is_superuser=False).count()
+        current_verified = User.objects.filter(
+            is_staff=False, is_superuser=False, is_verified=True, is_active=True
+        ).count()
+
+        # Failed verifications = users who are overdue for verification
+        current_failed = User.objects.filter(
+            is_staff=False,
+            is_superuser=False,
+            is_active=True,
+            verification_expires_at__lt=now,
+            is_verified=False,
+        ).count()
+
+        current_active_faces = User.objects.filter(
+            is_staff=False, is_superuser=False, face_added=True
+        ).count()
+
+        # Get last month stats for percentage calculation
+        last_month_total = User.objects.filter(
+            is_staff=False, is_superuser=False, date_joined__lt=current_month_start
+        ).count()
+
+        last_month_verified = User.objects.filter(
+            is_staff=False,
+            is_superuser=False,
+            is_verified=True,
+            is_active=True,
+            date_joined__lt=current_month_start,
+        ).count()
+
+        last_month_failed = User.objects.filter(
+            is_staff=False,
+            is_superuser=False,
+            is_active=True,
+            verification_expires_at__range=[last_month_start, current_month_start],
+            is_verified=False,
+        ).count()
+
+        last_month_faces = User.objects.filter(
+            is_staff=False,
+            is_superuser=False,
+            face_added=True,
+            date_joined__lt=current_month_start,
+        ).count()
+
+        def calculate_change(current: int, previous: int) -> float:
+            if previous == 0:
+                return 100.0 if current > 0 else 0.0
+            return ((current - previous) / previous) * 100
+
+        return {
+            "total_users": current_total,
+            "verified_users": current_verified,
+            "failed_verifications": current_failed,
+            "active_faces": current_active_faces,
+            "total_users_change": calculate_change(current_total, last_month_total),
+            "verified_users_change": calculate_change(
+                current_verified, last_month_verified
+            ),
+            "failed_verifications_change": calculate_change(
+                current_failed, last_month_failed
+            ),
+            "active_faces_change": calculate_change(
+                current_active_faces, last_month_faces
+            ),
+        }
+
+    def _get_verification_chart_data(self) -> list[Any]:
+        """
+        Get verification chart data for the last 30 days.
+        Returns empty array since we don't have VerificationAttempt model yet.
+        TODO: Implement real verification tracking.
+        """
+        return []
+
+    def _get_recent_activities(self) -> list[dict[str, Any]]:
+        """Get real recent activities based on actual user actions."""
+        activities: list[dict[str, Any]] = []
+
+        recent_users = User.objects.filter(
+            is_staff=False,
+            is_superuser=False,
+            date_joined__gte=timezone.now() - timedelta(days=7),
+        ).order_by("-date_joined")[:5]
+
+        for user in recent_users:
+            activities.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "user_created",
+                    "message": f"New user {user.get_full_name()} was registered in the system",
+                    "timestamp": user.date_joined,
+                    "user_id": str(user.id),
+                    "admin_id": None,
+                }
+            )
+
+        recently_verified = User.objects.filter(
+            is_staff=False,
+            is_superuser=False,
+            is_verified=True,
+            updated_at__gte=timezone.now() - timedelta(days=7),
+        ).order_by("-updated_at")[:3]
+
+        for user in recently_verified:
+            activities.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "user_verified",
+                    "message": f"{user.get_full_name()} completed verification successfully",
+                    "timestamp": user.updated_at,
+                    "user_id": str(user.id),
+                    "admin_id": None,
+                }
+            )
+
+        recent_faces = User.objects.filter(
+            is_staff=False,
+            is_superuser=False,
+            face_added=True,
+            updated_at__gte=timezone.now() - timedelta(days=7),
+        ).order_by("-updated_at")[:2]
+
+        for user in recent_faces:
+            activities.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "face_added",
+                    "message": f"Face data added for {user.get_full_name()}",
+                    "timestamp": user.updated_at,
+                    "user_id": str(user.id),
+                    "admin_id": None,
+                }
+            )
+
+        activities.sort(
+            key=lambda x: cast(datetime, x.get("timestamp") or timezone.now()),
+            reverse=True,
+        )
+        return activities[:10]

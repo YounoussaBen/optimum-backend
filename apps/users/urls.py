@@ -20,6 +20,9 @@ patterns = [
     path("admin/login/", AdminLoginView.as_view(), name="admin-login"),
     path("admin/logout/", AdminLogoutView.as_view(), name="admin-logout"),
     path("admin/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path(
+        "admin/dashboard/", views.DashboardStatsView.as_view(), name="dashboard-stats"
+    ),
 ]
 
 urlpatterns = patterns

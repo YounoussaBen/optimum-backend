@@ -340,3 +340,61 @@ class TokenRefreshResponseSerializer(serializers.Serializer):
     """
 
     access_token = serializers.CharField()
+
+
+class DashboardStatsSerializer(serializers.Serializer):
+    """
+    Serializer for dashboard statistics response.
+    """
+
+    total_users = serializers.IntegerField()
+    verified_users = serializers.IntegerField()
+    failed_verifications = serializers.IntegerField()
+    active_faces = serializers.IntegerField()
+    total_users_change = serializers.FloatField(required=False, allow_null=True)
+    verified_users_change = serializers.FloatField(required=False, allow_null=True)
+    failed_verifications_change = serializers.FloatField(
+        required=False, allow_null=True
+    )
+    active_faces_change = serializers.FloatField(required=False, allow_null=True)
+
+
+class VerificationDataPointSerializer(serializers.Serializer):
+    """
+    Serializer for verification chart data points.
+    """
+
+    date = serializers.DateField()
+    verifications = serializers.IntegerField()
+    failures = serializers.IntegerField()
+
+
+class RecentActivitySerializer(serializers.Serializer):
+    """
+    Serializer for recent activity items.
+    """
+
+    id = serializers.CharField()
+    type = serializers.ChoiceField(
+        choices=[
+            ("user_created", "User Created"),
+            ("user_verified", "User Verified"),
+            ("face_added", "Face Added"),
+            ("training_completed", "Training Completed"),
+            ("verification_failed", "Verification Failed"),
+        ]
+    )
+    message = serializers.CharField()
+    timestamp = serializers.DateTimeField()
+    user_id = serializers.CharField(required=False, allow_null=True)
+    admin_id = serializers.CharField(required=False, allow_null=True)
+
+
+class DashboardDataSerializer(serializers.Serializer):
+    """
+    Serializer for complete dashboard response.
+    """
+
+    stats = DashboardStatsSerializer()
+    verification_chart = VerificationDataPointSerializer(many=True)
+    recent_activities = RecentActivitySerializer(many=True)
