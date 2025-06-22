@@ -6,12 +6,9 @@ Implements Azure Face API integration with proper error handling and logging.
 
 import base64
 import logging
-from datetime import timedelta
 from typing import Any
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from drf_yasg import openapi
@@ -801,28 +798,26 @@ class FaceVerificationView(CreateAPIView):
             confidence = verification_result.get("confidence", 0.0)
 
             if is_identical and confidence >= confidence_threshold:
-                # Set verification status and expiration for face verification API only
-                # (not for manual admin verification)
+                # Verification successful - update user verification status
+
+                # Use the new verification method for consistency
                 if not request.user.is_staff:  # Only for normal users, not admin
-                    target_user.is_verified = True
-
-                    # Set verification expiration time
-                    verification_duration = getattr(
-                        settings, "FACE_VERIFICATION_DURATION_MINUTES", 60
-                    )
-                    target_user.verification_expires_at = timezone.now() + timedelta(
-                        minutes=verification_duration
-                    )
-
-                    target_user.save(
-                        update_fields=["is_verified", "verification_expires_at"]
+                    expiration_time = target_user.set_verified_with_expiration(
+                        verified_by_admin=False
                     )
 
                     logger.info(
                         f"Face verification successful for user {target_user.id} "
-                        f"(confidence: {confidence:.3f}, expires at: {target_user.verification_expires_at})"
+                        f"(confidence: {confidence:.3f}, expires at: {expiration_time})"
                     )
                 else:
+                    # For admin users, still no expiration (they don't need monthly verification)
+                    target_user.is_verified = True
+                    target_user.verification_expires_at = None
+                    target_user.save(
+                        update_fields=["is_verified", "verification_expires_at"]
+                    )
+
                     logger.info(
                         f"Face verification successful for admin user {target_user.id} "
                         f"(confidence: {confidence:.3f}, no expiration set)"

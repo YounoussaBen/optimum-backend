@@ -1,5 +1,7 @@
 import uuid
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.validators import MinLengthValidator, RegexValidator
 from django.db import models
@@ -187,11 +189,23 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def is_verification_expired(self):
-        """Check if face verification has expired."""
+        """
+        Check if face verification has expired.
+
+        NEW LOGIC:
+        - If verification_expires_at is None AND user is verified:
+          Treat as expired (force monthly verification)
+        - If verification_expires_at is set: Check actual expiration time
+        - If user is not verified: Not applicable
+        """
+        if not self.is_verified:
+            return False  # Can't expire if not verified
+
         if not self.verification_expires_at:
-            return (
-                not self.is_verified
-            )  # If no expiration set, rely on is_verified only
+            # Admin-verified users without expiration are treated as expired
+            # This forces them to do monthly self-verification
+            return True
+
         return timezone.now() > self.verification_expires_at
 
     def expire_verification(self):
@@ -199,3 +213,24 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.is_verified = False
         self.verification_expires_at = None
         self.save(update_fields=["is_verified", "verification_expires_at"])
+
+    def set_verified_with_expiration(self, verified_by_admin=False):
+        """
+        Set user as verified with proper expiration timer.
+
+        Args:
+            verified_by_admin (bool): Whether this was set by admin or user
+        """
+        self.is_verified = True
+
+        # Get verification duration from settings
+        verification_duration = settings.FACE_VERIFICATION_DURATION_MINUTES
+
+        # Set expiration time for ALL verifications (admin or user)
+        self.verification_expires_at = timezone.now() + timedelta(
+            minutes=verification_duration
+        )
+
+        self.save(update_fields=["is_verified", "verification_expires_at"])
+
+        return self.verification_expires_at

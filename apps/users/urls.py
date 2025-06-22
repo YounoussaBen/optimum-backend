@@ -23,6 +23,11 @@ patterns = [
     path(
         "admin/dashboard/", views.DashboardStatsView.as_view(), name="dashboard-stats"
     ),
+    path(
+        "admin/verify-user/",
+        views.AdminUserVerificationView.as_view(),
+        name="admin-verify-user",
+    ),
 ]
 
 urlpatterns = patterns

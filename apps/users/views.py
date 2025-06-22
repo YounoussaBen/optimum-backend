@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import (
@@ -133,6 +134,108 @@ class UserUpdateView(UpdateAPIView):
     )
     def patch(self, request, *args, **kwargs):
         return super().patch(request, *args, **kwargs)
+
+
+class AdminUserVerificationView(CreateAPIView):
+    """
+    API view for admin to verify/unverify users.
+    Sets proper expiration timers for verified users.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    @swagger_auto_schema(
+        operation_summary="Verify or unverify user",
+        operation_description="Admin endpoint to verify/unverify a user. "
+        "Verified users get a expiration timer and must complete monthly verification.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "user_id": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="UUID of the user to verify/unverify",
+                ),
+                "verified": openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="True to verify user, False to unverify",
+                ),
+            },
+            required=["user_id", "verified"],
+        ),
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "success": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    "message": openapi.Schema(type=openapi.TYPE_STRING),
+                    "user_id": openapi.Schema(type=openapi.TYPE_STRING),
+                    "is_verified": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    "verification_expires_at": openapi.Schema(
+                        type=openapi.TYPE_STRING,
+                        format=openapi.FORMAT_DATETIME,
+                        nullable=True,
+                    ),
+                },
+            ),
+            400: "Bad Request - Invalid user ID or data",
+            404: "Not Found - User not found",
+            401: "Unauthorized - Admin access required",
+        },
+        tags=["User Management"],
+    )
+    def post(self, request, *args, **kwargs):
+        """Verify or unverify a user with proper expiration handling."""
+
+        user_id = request.data.get("user_id")
+        verified = request.data.get("verified")
+
+        if user_id is None or verified is None:
+            return Response(
+                {"success": False, "error": "user_id and verified fields are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"success": False, "error": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if verified:
+            # Verify user with proper expiration timer
+            expiration_time = user.set_verified_with_expiration(verified_by_admin=True)
+
+            logger.info(
+                f"Admin {request.user.email} verified user {user.id}. "
+                f"Expires at: {expiration_time}"
+            )
+
+            message = f"User {user.get_full_name()} verified successfully. Must complete self-verification."
+
+        else:
+            # Unverify user
+            user.expire_verification()
+
+            logger.info(f"Admin {request.user.email} unverified user {user.id}")
+
+            message = f"User {user.get_full_name()} verification removed."
+
+        return Response(
+            {
+                "success": True,
+                "message": message,
+                "user_id": str(user.id),
+                "is_verified": user.is_verified,
+                "verification_expires_at": (
+                    user.verification_expires_at.isoformat()
+                    if user.verification_expires_at
+                    else None
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class UserDeleteView(DestroyAPIView):
