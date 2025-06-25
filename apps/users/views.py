@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any, cast
 
 from django.contrib.auth import get_user_model
+from django.db.models import Avg, Sum
 from django.utils import timezone
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -589,3 +590,155 @@ class DashboardStatsView(APIView):
             reverse=True,
         )
         return activities[:10]
+
+
+class AdaptiveLearningStatsView(APIView):
+    """
+    API view to get adaptive learning statistics.
+    Only accessible by admin users.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    @swagger_auto_schema(
+        operation_summary="Get adaptive learning statistics",
+        operation_description="Retrieve statistics about the adaptive face learning system. Admin access required.",
+        responses={
+            200: openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "total_users_with_faces": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "users_still_learning": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "users_at_max_capacity": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "users_never_authenticated": openapi.Schema(
+                        type=openapi.TYPE_INTEGER
+                    ),
+                    "average_auth_faces": openapi.Schema(type=openapi.TYPE_NUMBER),
+                    "total_adaptive_faces_added": openapi.Schema(
+                        type=openapi.TYPE_INTEGER
+                    ),
+                    "distribution": openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "range": openapi.Schema(type=openapi.TYPE_STRING),
+                                "count": openapi.Schema(type=openapi.TYPE_INTEGER),
+                                "percentage": openapi.Schema(type=openapi.TYPE_NUMBER),
+                            },
+                        ),
+                    ),
+                    "recent_learners": openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "user_id": openapi.Schema(type=openapi.TYPE_STRING),
+                                "name": openapi.Schema(type=openapi.TYPE_STRING),
+                                "auth_faces_count": openapi.Schema(
+                                    type=openapi.TYPE_INTEGER
+                                ),
+                                "last_updated": openapi.Schema(
+                                    type=openapi.TYPE_STRING
+                                ),
+                            },
+                        ),
+                    ),
+                },
+            ),
+            401: "Unauthorized - Admin access required",
+        },
+        tags=["Dashboard"],
+    )
+    def get(self, request, *args, **kwargs):
+        """Get comprehensive adaptive learning statistics."""
+        try:
+            # Get all active users with face registration
+            users = User.objects.filter(
+                is_active=True, face_added=True, person_id__isnull=False
+            ).exclude(person_id="")
+
+            total_users = users.count()
+
+            if total_users == 0:
+                return Response(
+                    {
+                        "message": "No users with face registration found",
+                        "total_users_with_faces": 0,
+                        "users_still_learning": 0,
+                        "users_at_max_capacity": 0,
+                        "users_never_authenticated": 0,
+                        "average_auth_faces": 0,
+                        "total_adaptive_faces_added": 0,
+                        "distribution": [],
+                        "recent_learners": [],
+                    }
+                )
+
+            # Calculate statistics
+            stats = users.aggregate(
+                avg_auth_faces=Avg("auth_faces_count"),
+                total_adaptive_faces=Sum("auth_faces_count"),
+            )
+
+            # Count users by categories
+            learning_active = users.filter(auth_faces_count__lt=100).count()
+            learning_maxed = users.filter(auth_faces_count=100).count()
+            never_authenticated = users.filter(auth_faces_count=0).count()
+
+            # Calculate distribution
+            ranges = [
+                (0, 0, "Never authenticated"),
+                (1, 10, "1-10 authentications"),
+                (11, 25, "11-25 authentications"),
+                (26, 50, "26-50 authentications"),
+                (51, 75, "51-75 authentications"),
+                (76, 99, "76-99 authentications"),
+                (100, 100, "Maximum (100 authentications)"),
+            ]
+
+            distribution = []
+            for min_count, max_count, label in ranges:
+                count = users.filter(
+                    auth_faces_count__gte=min_count, auth_faces_count__lte=max_count
+                ).count()
+                percentage = (count / total_users) * 100 if total_users > 0 else 0
+                distribution.append(
+                    {"range": label, "count": count, "percentage": round(percentage, 1)}
+                )
+
+            # Get recent learners (users who have added faces recently)
+            recent_learners = users.filter(auth_faces_count__gt=0).order_by(
+                "-updated_at"
+            )[:10]
+
+            recent_learners_data = []
+            for user in recent_learners:
+                recent_learners_data.append(
+                    {
+                        "user_id": str(user.id),
+                        "name": user.get_full_name(),
+                        "auth_faces_count": user.auth_faces_count,
+                        "last_updated": user.updated_at.isoformat(),
+                    }
+                )
+
+            response_data = {
+                "total_users_with_faces": total_users,
+                "users_still_learning": learning_active,
+                "users_at_max_capacity": learning_maxed,
+                "users_never_authenticated": never_authenticated,
+                "average_auth_faces": round(stats["avg_auth_faces"] or 0, 2),
+                "total_adaptive_faces_added": stats["total_adaptive_faces"] or 0,
+                "distribution": distribution,
+                "recent_learners": recent_learners_data,
+            }
+
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error getting adaptive learning stats: {str(e)}")
+            return Response(
+                {"error": "Failed to retrieve adaptive learning statistics"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

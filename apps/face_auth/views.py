@@ -528,15 +528,21 @@ class FaceAuthenticationView(CreateAPIView):
     API view for face-based authentication.
     Authenticates users using PIN + face verification.
     Public endpoint - no authentication required.
+
+    Adaptive Learning
+    - After successful authentication, adds the current image to improve recognition
+    - Trains the person group for better future accuracy
+    - Stops adding after 100 successful authentications to respect Azure limits
     """
 
     serializer_class = FaceAuthenticationSerializer
     permission_classes = [AllowAny]
 
     @swagger_auto_schema(
-        operation_summary="Face authentication",
+        operation_summary="Face authentication with adaptive learning",
         operation_description="Authenticate user using PIN and face verification. "
-        "Returns JWT tokens on successful authentication.",
+        "Returns JWT tokens on successful authentication. "
+        "Automatically improves recognition accuracy by adding successful images to the user's face collection (up to 100 images).",
         responses={
             200: FaceAuthenticationResponseSerializer,
             400: "Bad Request - Validation errors",
@@ -550,7 +556,7 @@ class FaceAuthenticationView(CreateAPIView):
         return super().post(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
-        """Authenticate user with face + PIN."""
+        """Authenticate user with face + PIN and adaptive learning."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -558,9 +564,7 @@ class FaceAuthenticationView(CreateAPIView):
         confidence_threshold = serializer.validated_data.get(
             "confidence_threshold", 0.7
         )
-        person_group_id = serializer.validated_data.get(
-            "person_group_id"
-        )  # Add this line
+        person_group_id = serializer.validated_data.get("person_group_id")
 
         try:
             # Get user by PIN
@@ -606,11 +610,11 @@ class FaceAuthenticationView(CreateAPIView):
             # Use the first detected face
             face_id = detected_faces[0]["faceId"]
 
-            # Verify face against user's person in Azure (with optional person group)
+            # Verify face against user's person in Azure
             verification_result = azure_service.verify_face(
                 face_id=face_id,
                 person_id=user.person_id,
-                person_group_id=person_group_id,  # Add this line
+                person_group_id=person_group_id,
             )
 
             is_identical = verification_result.get("isIdentical", False)
@@ -627,17 +631,22 @@ class FaceAuthenticationView(CreateAPIView):
                     f"(confidence: {confidence:.3f})"
                 )
 
-                return Response(
-                    {
-                        "success": True,
-                        "user_id": user.id,
-                        "access_token": access_token,
-                        "refresh_token": refresh_token,
-                        "confidence_score": confidence,
-                        "message": "Authentication successful",
-                    },
-                    status=status.HTTP_200_OK,
+                learning_performed = self._perform_adaptive_learning(
+                    user, image_data, azure_service, person_group_id
                 )
+
+                response_data = {
+                    "success": True,
+                    "user_id": user.id,
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "confidence_score": confidence,
+                    "message": "Authentication successful",
+                    "adaptive_learning_performed": learning_performed,
+                    "auth_faces_count": user.auth_faces_count,
+                }
+
+                return Response(response_data, status=status.HTTP_200_OK)
             else:
                 logger.warning(
                     f"Authentication failed for user {user.id}: "
@@ -667,6 +676,83 @@ class FaceAuthenticationView(CreateAPIView):
                 {"success": False, "message": "Authentication service error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def _perform_adaptive_learning(
+        self, user, image_data, azure_service, person_group_id=None
+    ):
+        """
+        Perform adaptive learning by adding the successful authentication image
+        to the user's face collection and training the person group.
+
+        Args:
+            user: User instance
+            image_data: Dict containing image data (url or binary)
+            azure_service: AzureFaceService instance
+            person_group_id: Optional person group ID
+
+        Returns:
+            bool: True if learning was performed, False otherwise
+        """
+        # Check if user can add more faces
+        if not user.can_add_more_auth_faces:
+            logger.info(
+                f"User {user.id} has reached max auth faces limit ({user.auth_faces_count}/100). "
+                "Skipping adaptive learning."
+            )
+            return False
+
+        try:
+            # Add the successful authentication image as a new face
+            logger.info(
+                f"Adding authentication image as new face for user {user.id} "
+                f"(count: {user.auth_faces_count + 1}/100)"
+            )
+
+            face_result = azure_service.add_person_face(
+                person_id=user.person_id,
+                person_group_id=person_group_id,
+                image_url=image_data.get("image_url"),
+                image_data=image_data.get("image_binary"),
+                user_data=f"Auth face #{user.auth_faces_count + 1} for user {user.id}",
+            )
+
+            # Increment the counter
+            user.increment_auth_faces_count()
+
+            logger.info(
+                f"Successfully added auth face for user {user.id}. "
+                f"Face ID: {face_result.get('persistedFaceId')}. "
+                f"Total auth faces: {user.auth_faces_count}"
+            )
+
+            # Train the person group for improved accuracy
+            try:
+                azure_service.train_person_group(person_group_id)
+                logger.info(
+                    f"Successfully started training for person group after adding face for user {user.id}"
+                )
+            except Exception as train_error:
+                # Don't fail the whole process if training fails
+                logger.warning(
+                    f"Training failed after adding face for user {user.id}: {str(train_error)}"
+                )
+
+            return True
+
+        except AzureFaceAPIError as e:
+            # Don't fail authentication if adaptive learning fails
+            logger.warning(
+                f"Adaptive learning failed for user {user.id}: {str(e)}. "
+                "Authentication still successful."
+            )
+            return False
+        except Exception as e:
+            # Don't fail authentication if adaptive learning fails
+            logger.warning(
+                f"Unexpected error during adaptive learning for user {user.id}: {str(e)}. "
+                "Authentication still successful."
+            )
+            return False
 
     def _prepare_image_data(self, validated_data: dict) -> dict[str, Any]:
         """Prepare image data for Azure Face API call."""

@@ -28,6 +28,11 @@ patterns = [
         views.AdminUserVerificationView.as_view(),
         name="admin-verify-user",
     ),
+    path(
+        "admin/adaptive-learning-stats/",
+        views.AdaptiveLearningStatsView.as_view(),
+        name="adaptive-learning-stats",
+    ),
 ]
 
 urlpatterns = patterns

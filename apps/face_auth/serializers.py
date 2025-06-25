@@ -213,7 +213,7 @@ class FaceAuthenticationSerializer(serializers.Serializer):
 
 
 class FaceAuthenticationResponseSerializer(serializers.Serializer):
-    """Serializer for face authentication response."""
+    """Serializer for face authentication response with adaptive learning info."""
 
     success = serializers.BooleanField()
     user_id = serializers.UUIDField(required=False)
@@ -221,6 +221,15 @@ class FaceAuthenticationResponseSerializer(serializers.Serializer):
     refresh_token = serializers.CharField(required=False)
     confidence_score = serializers.FloatField(required=False)
     message = serializers.CharField()
+
+    adaptive_learning_performed = serializers.BooleanField(
+        required=False,
+        help_text="Whether adaptive learning was performed (face added for improvement)",
+    )
+    auth_faces_count = serializers.IntegerField(
+        required=False,
+        help_text="Current number of faces added during authentication (max 100)",
+    )
 
 
 class FaceVerificationSerializer(serializers.Serializer):

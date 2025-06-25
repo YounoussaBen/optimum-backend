@@ -96,6 +96,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=False, help_text="Whether user has completed face registration"
     )
 
+    auth_faces_count = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of faces added during successful authentications (max 100)",
+    )
+
     # User Status
     is_active = models.BooleanField(
         default=True,
@@ -188,6 +193,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.is_active and self.is_verified and self.is_face_registered
 
     @property
+    def can_add_more_auth_faces(self):
+        """Check if user can have more faces added during authentication."""
+        return self.auth_faces_count < 100
+
+    @property
     def is_verification_expired(self):
         """
         Check if face verification has expired.
@@ -234,3 +244,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.save(update_fields=["is_verified", "verification_expires_at"])
 
         return self.verification_expires_at
+
+    def increment_auth_faces_count(self):
+        """Increment the count of authentication-based faces."""
+        if self.can_add_more_auth_faces:
+            self.auth_faces_count += 1
+            self.save(update_fields=["auth_faces_count"])
+            return True
+        return False
