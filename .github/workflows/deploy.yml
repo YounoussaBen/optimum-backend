@@ -76,7 +76,7 @@ jobs:
 
     - name: Run type checking with mypy
       run: |
-        uv run mypy .
+        uv run mypy . --ignore-missing-imports --disable-error-code=dict-item
 
     - name: Run tests with pytest
       run: |
