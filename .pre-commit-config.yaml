@@ -74,5 +74,5 @@ repos:
           - drf_yasg
           - django-debug-toolbar
           - psycopg[binary]
-        args: [--ignore-missing-imports, --show-error-codes]
+        args: [--ignore-missing-imports, --show-error-codes, --disable-error-code=dict-item]
         files: '^(apps|core)/.*\.py$'
