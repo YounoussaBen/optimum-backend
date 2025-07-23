@@ -1,17 +1,28 @@
 #!/bin/bash
-# render_deploy.sh - Complete deployment script for Render
 
-set -e  # Exit on any error
+# Debug environment
+echo "=== DEBUG: Environment variables ==="
+echo "PORT environment variable: '$PORT'"
+env | grep PORT
+echo "===================================="
 
-echo "Starting Django application on Render..."
+# Ensure PORT environment variable is set
+if [ -z "$PORT" ]; then
+    echo "WARNING: PORT not set, defaulting to 8000"
+    export PORT=8000
+fi
+
+echo "Starting Django app on port: $PORT"
 
 # Create necessary directories
 mkdir -p /app/static
 mkdir -p /app/staticfiles
 
+# Run migrations
 echo "Running migrations..."
 python manage.py migrate --noinput
 
+# Collect static files
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
@@ -21,6 +32,6 @@ python manage.py create_superuser
 
 python manage.py createcachetable
 
-# Start the application
-echo "Starting server..."
-exec gunicorn --bind 0.0.0.0:$PORT core.wsgi:application --workers 2
+# Start gunicorn server
+echo "Starting gunicorn on host 0.0.0.0 port $PORT"
+exec gunicorn core.wsgi:application --bind 0.0.0.0:${PORT} --workers 2

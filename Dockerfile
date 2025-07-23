@@ -62,7 +62,7 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY . .
 
 # Make startup script executable
-RUN chmod +x /app/docker-start.sh
+RUN chmod +x /app/startup.sh
 
 # Set correct permissions
 RUN mkdir -p /app/staticfiles /app/media /app/logs && \
@@ -77,4 +77,4 @@ ENV DJANGO_SETTINGS_MODULE=core.settings.prod \
     PYTHONPATH=/app
 
 # Default command
-CMD ["/app/docker-start.sh"]
+CMD ["/app/startup.sh"]
