@@ -7,6 +7,7 @@ authors = [{ name = "Younoussa Ben", email = "younoussaabdourhaman@gmail.com" }]
 license = {text = "MIT"}
 dependencies = [
     "azure-storage-blob>=12.25.1",
+    "celery>=5.3.0",
     "dj-database-url>=3.0.0",
     "django>=5.2.3",
     "django-cors-headers>=4.7.0",
@@ -19,6 +20,7 @@ dependencies = [
     "python-decouple>=3.8",
     "python-dotenv>=1.1.0",
     "python-json-logger>=3.3.0",
+    "redis>=5.0.0",
     "requests>=2.32.4",
     "uvicorn>=0.32.1",
     "whitenoise>=6.9.0",
@@ -29,16 +31,19 @@ dependencies = [
 [dependency-groups]
 dev = [
     "black>=25.1.0",
+    "celery>=5.3.0",
     "django-debug-toolbar>=5.2.0",
     "factory-boy>=3.3.3",
     "pre-commit>=4.2.0",
     "pytest-cov>=6.2.1",
     "pytest-django>=4.11.1",
+    "redis>=5.0.0",
     "ruff>=0.12.0",
     "mypy>=1.6.0",
     "django-stubs>=4.2.0",
     "djangorestframework-stubs>=3.15.0",
     "types-requests>=2.32.0",
+    "types-redis>=4.6.0",
 ]
 
 [build-system]

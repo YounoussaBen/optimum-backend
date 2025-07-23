@@ -32,6 +32,15 @@ python manage.py create_superuser
 
 python manage.py createcachetable
 
+# Start Celery worker in background (only if REDIS_URL is set)
+if [ ! -z "$REDIS_URL" ]; then
+    echo "Starting Celery worker..."
+    celery -A core worker --loglevel=info --detach
+
+    echo "Starting Celery beat scheduler..."
+    celery -A core beat --loglevel=info --detach
+fi
+
 # Start gunicorn server
 echo "Starting gunicorn on host 0.0.0.0 port $PORT"
 exec gunicorn core.wsgi:application --bind 0.0.0.0:${PORT} --workers 2

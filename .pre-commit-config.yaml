@@ -74,6 +74,9 @@ repos:
           - drf_yasg
           - django-debug-toolbar
           - psycopg[binary]
+          - celery
+          - redis
+          - types-redis
         args: [--ignore-missing-imports, --show-error-codes, --disable-error-code=dict-item]
         files: '^(apps|core)/.*\.py$'
 
