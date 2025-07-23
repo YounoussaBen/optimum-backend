@@ -890,30 +890,15 @@ class FaceVerificationView(CreateAPIView):
             confidence = verification_result.get("confidence", 0.0)
 
             if is_identical and confidence >= confidence_threshold:
-                # Verification successful - update user verification status
+                # Verification successful - set verification to true with 30-day expiration
+                expiration_time = target_user.set_verified_with_expiration(
+                    verified_by_admin=request.user.is_staff
+                )
 
-                # Use the new verification method for consistency
-                if not request.user.is_staff:  # Only for normal users, not admin
-                    expiration_time = target_user.set_verified_with_expiration(
-                        verified_by_admin=False
-                    )
-
-                    logger.info(
-                        f"Face verification successful for user {target_user.id} "
-                        f"(confidence: {confidence:.3f}, expires at: {expiration_time})"
-                    )
-                else:
-                    # For admin users, still no expiration (they don't need monthly verification)
-                    target_user.is_verified = True
-                    target_user.verification_expires_at = None
-                    target_user.save(
-                        update_fields=["is_verified", "verification_expires_at"]
-                    )
-
-                    logger.info(
-                        f"Face verification successful for admin user {target_user.id} "
-                        f"(confidence: {confidence:.3f}, no expiration set)"
-                    )
+                logger.info(
+                    f"Face verification successful for user {target_user.id} "
+                    f"(confidence: {confidence:.3f}, expires at: {expiration_time})"
+                )
 
                 return Response(
                     {

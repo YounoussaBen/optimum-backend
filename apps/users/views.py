@@ -213,7 +213,7 @@ class AdminUserVerificationView(CreateAPIView):
                 f"Expires at: {expiration_time}"
             )
 
-            message = f"User {user.get_full_name()} verified successfully. Must complete self-verification."
+            message = f"User {user.get_full_name()} verified successfully with 30-day expiration."
 
         else:
             # Unverify user

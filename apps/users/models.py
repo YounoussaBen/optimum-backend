@@ -1,7 +1,7 @@
 import uuid
 from datetime import timedelta
 
-from django.conf import settings
+# from django.conf import settings  # Will be used for future settings-based configuration
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.core.validators import MinLengthValidator, RegexValidator
 from django.db import models
@@ -189,8 +189,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def can_authenticate(self):
-        """Check if user can authenticate (active, verified, face registered)."""
-        return self.is_active and self.is_verified and self.is_face_registered
+        """Check if user can authenticate (active, face registered)."""
+        return self.is_active and self.is_face_registered
 
     @property
     def can_add_more_auth_faces(self):
@@ -202,18 +202,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         """
         Check if face verification has expired.
 
-        NEW LOGIC:
-        - If verification_expires_at is None AND user is verified:
-          Treat as expired (force monthly verification)
-        - If verification_expires_at is set: Check actual expiration time
-        - If user is not verified: Not applicable
+        Verification expires 30 days after being set to true.
+        If verification_expires_at is None and user is verified, treat as expired.
         """
         if not self.is_verified:
             return False  # Can't expire if not verified
 
         if not self.verification_expires_at:
-            # Admin-verified users without expiration are treated as expired
-            # This forces them to do monthly self-verification
+            # Users without expiration date are treated as expired
             return True
 
         return timezone.now() > self.verification_expires_at
@@ -226,20 +222,16 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def set_verified_with_expiration(self, verified_by_admin=False):
         """
-        Set user as verified with proper expiration timer.
+        Set user as verified with 30-day expiration timer.
 
         Args:
-            verified_by_admin (bool): Whether this was set by admin or user
+            verified_by_admin (bool): Whether this was set by admin or user (for logging purposes)
         """
         self.is_verified = True
 
-        # Get verification duration from settings
-        verification_duration = settings.FACE_VERIFICATION_DURATION_MINUTES
-
-        # Set expiration time for ALL verifications (admin or user)
-        self.verification_expires_at = timezone.now() + timedelta(
-            minutes=verification_duration
-        )
+        # Set expiration time to 30 days from now
+        # Note: verified_by_admin parameter is preserved for API compatibility
+        self.verification_expires_at = timezone.now() + timedelta(days=30)
 
         self.save(update_fields=["is_verified", "verification_expires_at"])
 
