@@ -61,15 +61,20 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy rest of the code
 COPY . .
 
+# Make startup script executable
+RUN chmod +x /app/docker-start.sh
+
 # Set correct permissions
 RUN mkdir -p /app/staticfiles /app/media /app/logs && \
     chown -R django:django /app
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
 # Final user
 USER django
 
+# Set Django settings for production
+ENV DJANGO_SETTINGS_MODULE=core.settings.prod \
+    DEBUG=False \
+    PYTHONPATH=/app
+
 # Default command
-CMD ["uvicorn", "core.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/docker-start.sh"]
