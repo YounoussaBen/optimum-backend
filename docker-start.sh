@@ -22,6 +22,6 @@ python manage.py migrate --noinput
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Start uvicorn server
-echo "Starting uvicorn on host 0.0.0.0 port $PORT"
-exec uvicorn core.asgi:application --host 0.0.0.0 --port ${PORT}
+# Start gunicorn server
+echo "Starting gunicorn on host 0.0.0.0 port $PORT"
+exec gunicorn core.wsgi:application --bind 0.0.0.0:${PORT} --workers 2
