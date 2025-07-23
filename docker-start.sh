@@ -24,5 +24,4 @@ python manage.py collectstatic --noinput
 
 # Start uvicorn server
 echo "Starting uvicorn on host 0.0.0.0 port $PORT"
-# Ensure PORT is treated as integer by removing quotes
 exec uvicorn core.asgi:application --host 0.0.0.0 --port ${PORT}
