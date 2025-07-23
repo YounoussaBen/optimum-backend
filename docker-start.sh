@@ -14,6 +14,10 @@ fi
 
 echo "Starting Django app on port: $PORT"
 
+# Create necessary directories
+mkdir -p /app/static
+mkdir -p /app/staticfiles
+
 # Run migrations
 echo "Running migrations..."
 python manage.py migrate --noinput
@@ -21,6 +25,12 @@ python manage.py migrate --noinput
 # Collect static files
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
+
+echo "Creating superuser if needed..."
+# Use the custom management command instead of shell
+python manage.py create_superuser
+
+python manage.py createcachetable
 
 # Start gunicorn server
 echo "Starting gunicorn on host 0.0.0.0 port $PORT"
