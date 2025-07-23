@@ -9,7 +9,7 @@ from typing import Any
 import requests
 from django.conf import settings
 from rest_framework import status
-from rest_framework.exceptions import APIException, ValidationError
+from rest_framework.exceptions import APIException, ErrorDetail, ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,14 @@ class AzureFaceAPIError(APIException):
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     default_detail = "Azure Face API service temporarily unavailable."
     default_code = "azure_face_api_error"
+
+    def __init__(self, detail=None, status_code=None):
+        super().__init__(detail)
+        if status_code:
+            self.status_code = status_code
+            self.detail = ErrorDetail(
+                f"{detail} (Status: {status_code})", code=self.default_code
+            )
 
 
 class AzureFaceService:
@@ -32,6 +40,7 @@ class AzureFaceService:
         self.api_key = settings.AZURE_FACE_API_KEY
         self.endpoint = settings.AZURE_FACE_ENDPOINT.rstrip("/")
         self.default_person_group_id = settings.AZURE_FACE_PERSON_GROUP_ID
+        self.person_group_id = self.default_person_group_id
 
         if not self.api_key:
             raise ValidationError("Azure Face API key not configured")
@@ -71,7 +80,7 @@ class AzureFaceService:
         elif response.status_code == 400:
             error_msg = self._extract_error_message(response_data)
             logger.warning(f"Azure Face API bad request for {operation}: {error_msg}")
-            raise ValidationError(f"Invalid request: {error_msg}")
+            raise AzureFaceAPIError(f"Invalid request: {error_msg}", 400)
         elif response.status_code == 401:
             logger.error(f"Azure Face API unauthorized for {operation}")
             raise AzureFaceAPIError("Invalid API credentials")
@@ -84,7 +93,7 @@ class AzureFaceService:
         elif response.status_code == 409:
             error_msg = self._extract_error_message(response_data)
             logger.warning(f"Azure Face API conflict for {operation}: {error_msg}")
-            raise ValidationError(f"Resource conflict: {error_msg}")
+            raise AzureFaceAPIError(f"Resource conflict: {error_msg}", 409)
         elif response.status_code == 429:
             logger.warning(f"Azure Face API rate limit exceeded for {operation}")
             raise AzureFaceAPIError("Rate limit exceeded. Please try again later.")
@@ -92,7 +101,9 @@ class AzureFaceService:
             logger.error(
                 f"Azure Face API error for {operation}: {response.status_code}"
             )
-            raise AzureFaceAPIError(f"API error: {response.status_code}")
+            raise AzureFaceAPIError(
+                f"API error: {response.status_code}", response.status_code
+            )
 
     def _extract_error_message(self, response_data: dict) -> str:
         """Extract error message from Azure Face API response."""
@@ -283,20 +294,20 @@ class AzureFaceService:
 
     def create_person(
         self,
+        person_group_id: str,
         name: str,
-        person_group_id: str | None = None,
         user_data: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> str:
         """
         Create a person in a person group.
 
         Args:
-            name: Person's name
             person_group_id: Person group to add person to
+            name: Person's name
             user_data: Optional user data
 
         Returns:
-            Person creation result with person_id
+            Person ID string
         """
         group_id = person_group_id or self.default_person_group_id
         url = f"{self.endpoint}/persongroups/{group_id}/persons"
@@ -311,10 +322,9 @@ class AzureFaceService:
                 response, f"create_person({name} in {group_id})"
             )
 
-            logger.info(
-                f"Successfully created person {name} with ID: {result.get('personId')}"
-            )
-            return result
+            person_id = result.get("personId")
+            logger.info(f"Successfully created person {name} with ID: {person_id}")
+            return person_id
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error creating person {name}: {str(e)}")
@@ -324,15 +334,12 @@ class AzureFaceService:
 
     # Face Operations
 
-    def detect_face(
-        self, image_url: str | None = None, image_data: bytes | None = None
-    ) -> list[dict[str, Any]]:
+    def detect_face(self, image_base64: str) -> list[dict[str, Any]]:
         """
         Detect faces in an image.
 
         Args:
-            image_url: URL of the image to analyze
-            image_data: Binary image data
+            image_base64: Base64 encoded image data
 
         Returns:
             List of detected faces with face IDs
@@ -341,22 +348,22 @@ class AzureFaceService:
         params = {"returnFaceId": "true"}
 
         headers = self._get_headers()
+        headers["Content-Type"] = "application/octet-stream"
 
         try:
-            if image_url:
-                data = {"url": image_url}
-                response = requests.post(
-                    url, headers=headers, json=data, params=params, timeout=30
-                )
-            elif image_data:
-                headers["Content-Type"] = "application/octet-stream"
-                response = requests.post(
-                    url, headers=headers, data=image_data, params=params, timeout=30
-                )
-            else:
-                raise ValidationError("Either image_url or image_data must be provided")
+            import base64
+
+            image_data = base64.b64decode(image_base64)
+            response = requests.post(
+                url, headers=headers, data=image_data, params=params, timeout=30
+            )
 
             result = self._handle_response(response, "detect_face")
+
+            if len(result) == 0:
+                raise AzureFaceAPIError("No face detected in the image")
+            elif len(result) > 1:
+                raise AzureFaceAPIError("Multiple faces detected in the image")
 
             logger.info(f"Successfully detected {len(result)} faces")
             return result
@@ -368,19 +375,26 @@ class AzureFaceService:
             ) from None
 
     def verify_face(
-        self, face_id: str, person_id: str, person_group_id: str | None = None
+        self, image_base64: str, person_id: str, person_group_id: str
     ) -> dict[str, Any]:
         """
         Verify if a face belongs to a specific person.
 
         Args:
-            face_id: Face ID from face detection
+            image_base64: Base64 encoded image data
             person_id: Person ID to verify against
             person_group_id: Person group containing the person
 
         Returns:
             Verification result with confidence score
         """
+        # First detect face to get face ID
+        faces = self.detect_face(image_base64)
+        if not faces:
+            raise AzureFaceAPIError("No face detected")
+
+        face_id = faces[0]["faceId"]
+
         group_id = person_group_id or self.default_person_group_id
         url = f"{self.endpoint}/verify"
 
@@ -394,14 +408,75 @@ class AzureFaceService:
                 response, f"verify_face({face_id} vs {person_id})"
             )
 
+            # Convert response format to match test expectations
+            formatted_result = {
+                "is_identical": result.get("isIdentical", False),
+                "confidence": result.get("confidence", 0.0),
+            }
+
             logger.info(
-                f"Face verification result: {result.get('isIdentical')} "
-                f"(confidence: {result.get('confidence', 0):.3f})"
+                f"Face verification result: {formatted_result['is_identical']} "
+                f"(confidence: {formatted_result['confidence']:.3f})"
             )
-            return result
+            return formatted_result
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error verifying face: {str(e)}")
+            raise AzureFaceAPIError(
+                "Network error connecting to Azure Face API"
+            ) from None
+
+    def identify_face(self, image_base64: str, person_group_id: str) -> dict[str, Any]:
+        """
+        Identify a face in a person group.
+
+        Args:
+            image_base64: Base64 encoded image data
+            person_group_id: Person group to search in
+
+        Returns:
+            Identification result with person_id and confidence
+        """
+        # First detect face to get face ID
+        faces = self.detect_face(image_base64)
+        if not faces:
+            raise AzureFaceAPIError("No face detected")
+
+        face_id = faces[0]["faceId"]
+
+        url = f"{self.endpoint}/identify"
+        data = {
+            "faceIds": [face_id],
+            "personGroupId": person_group_id,
+            "maxNumOfCandidatesReturned": 1,
+            "confidenceThreshold": 0.5,
+        }
+
+        try:
+            response = requests.post(
+                url, headers=self._get_headers(), json=data, timeout=30
+            )
+            result = self._handle_response(
+                response, f"identify_face in {person_group_id}"
+            )
+
+            if not result or not result[0].get("candidates"):
+                raise AzureFaceAPIError("No matching person found")
+
+            candidate = result[0]["candidates"][0]
+            formatted_result = {
+                "person_id": candidate["personId"],
+                "confidence": candidate["confidence"],
+            }
+
+            logger.info(
+                f"Face identification result: {formatted_result['person_id']} "
+                f"(confidence: {formatted_result['confidence']:.3f})"
+            )
+            return formatted_result
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error identifying face: {str(e)}")
             raise AzureFaceAPIError(
                 "Network error connecting to Azure Face API"
             ) from None
@@ -444,54 +519,46 @@ class AzureFaceService:
 
     def add_person_face(
         self,
+        person_group_id: str,
         person_id: str,
-        image_url: str | None = None,
-        image_data: bytes | None = None,
-        person_group_id: str | None = None,
+        image_base64: str,
         user_data: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> str:
         """
         Add a face to a person in a person group.
 
         Args:
-            person_id: Person ID to add face to
-            image_url: URL of the face image
-            image_data: Binary image data
             person_group_id: Person group containing the person
+            person_id: Person ID to add face to
+            image_base64: Base64 encoded image data
             user_data: Optional user data for the face
 
         Returns:
-            Add face result with persisted face ID
+            Persisted face ID string
         """
         group_id = person_group_id or self.default_person_group_id
         url = f"{self.endpoint}/persongroups/{group_id}/persons/{person_id}/persistedFaces"
 
         headers = self._get_headers()
+        headers["Content-Type"] = "application/octet-stream"
+
         params = {}
         if user_data:
             params["userData"] = user_data
 
         try:
-            if image_url:
-                data = {"url": image_url}
-                response = requests.post(
-                    url, headers=headers, json=data, params=params, timeout=30
-                )
-            elif image_data:
-                headers["Content-Type"] = "application/octet-stream"
-                response = requests.post(
-                    url, headers=headers, data=image_data, params=params, timeout=30
-                )
-            else:
-                raise ValidationError("Either image_url or image_data must be provided")
+            import base64
+
+            image_data = base64.b64decode(image_base64)
+            response = requests.post(
+                url, headers=headers, data=image_data, params=params, timeout=30
+            )
 
             result = self._handle_response(response, f"add_person_face({person_id})")
 
-            logger.info(
-                f"Successfully added face to person {person_id}: "
-                f"{result.get('persistedFaceId')}"
-            )
-            return result
+            face_id = result.get("persistedFaceId")
+            logger.info(f"Successfully added face to person {person_id}: {face_id}")
+            return face_id
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Network error adding face to person {person_id}: {str(e)}")

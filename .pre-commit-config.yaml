@@ -76,3 +76,14 @@ repos:
           - psycopg[binary]
         args: [--ignore-missing-imports, --show-error-codes, --disable-error-code=dict-item]
         files: '^(apps|core)/.*\.py$'
+
+  # Run tests with pytest
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Run tests
+        entry: uv run pytest
+        language: system
+        types: [python]
+        pass_filenames: false
+        args: [--cov=apps, --cov-report=term-missing, --tb=short]
