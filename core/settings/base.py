@@ -227,12 +227,16 @@ AZURE_FACE_API_KEY = get_env("AZURE_FACE_API_KEY", "")
 AZURE_FACE_ENDPOINT = get_env("AZURE_FACE_ENDPOINT", "")
 AZURE_FACE_PERSON_GROUP_ID = get_env("AZURE_FACE_PERSON_GROUP_ID", "optimum")
 
-# CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://optimum.vercel.app",
-]
+# CORS settings - will be overridden by environment variable in production
+CORS_ALLOWED_ORIGINS = get_env(
+    "CORS_ALLOWED_ORIGINS",
+    [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://optimum.vercel.app",
+    ],
+    list,
+)
 CORS_ALLOW_CREDENTIALS = True
 
 # Logging Configuration

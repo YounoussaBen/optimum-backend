@@ -6,7 +6,7 @@ URL configuration for optimum project.
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.http import HttpResponse
+from django.shortcuts import render
 from django.urls import include, path, re_path
 from drf_yasg import openapi
 from drf_yasg.generators import OpenAPISchemaGenerator
@@ -41,20 +41,8 @@ schema_view = get_schema_view(
 
 
 def api_root(request):
-    """Simple API root endpoint"""
-    return HttpResponse(
-        """
-        <h1>Optimum Financial API</h1>
-        <p>Welcome to the Optimum Financial API</p>
-        <ul>
-            <li><a href="/api/">API Endpoints</a></li>
-            <li><a href="/admin/">Admin Panel</a></li>
-            <li><a href="/swagger/">API Documentation (Swagger)</a></li>
-            <li><a href="/health/">Health Check</a></li>
-        </ul>
-        """,
-        content_type="text/html",
-    )
+    """Modern API root endpoint with template"""
+    return render(request, "index.html")
 
 
 urlpatterns = [
