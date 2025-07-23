@@ -65,11 +65,13 @@ else:
         }
     }
 
-# Production security settings
-SECURE_SSL_REDIRECT = False  # Disabled to prevent redirect loops on Azure
-SECURE_HSTS_SECONDS = 31536000  # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+# Production security settings - Azure handles SSL termination
+SECURE_SSL_REDIRECT = False  # Azure handles SSL termination
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # Trust Azure proxy
+# Disable HSTS to prevent redirect loops during debugging
+SECURE_HSTS_SECONDS = 0  # Disabled for debugging
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
@@ -208,7 +210,12 @@ SIMPLE_JWT.update(
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
 
+# Override for Azure to prevent redirect loops
+APPEND_SLASH = False  # Disable trailing slash redirects
+
 print("Production mode enabled")
 print(f"Allowed hosts: {ALLOWED_HOSTS}")
 print(f"Database host: {DATABASES['default'].get('HOST', 'Not configured')}")
 print(f"Azure Face API configured: {bool(AZURE_FACE_API_KEY)}")
+print(f"APPEND_SLASH: {APPEND_SLASH}")
+print(f"SECURE_SSL_REDIRECT: {SECURE_SSL_REDIRECT}")
