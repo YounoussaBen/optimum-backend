@@ -160,6 +160,13 @@ LOGGING = {
 if "WEBSITE_HOSTNAME" in os.environ:
     # Running on Azure App Service
     ALLOWED_HOSTS.append(os.environ["WEBSITE_HOSTNAME"])
+    # Add Azure internal load balancer IPs for health checks
+    ALLOWED_HOSTS.extend(
+        [
+            "169.254.130.6",  # Azure internal load balancer
+            "127.0.0.1",  # Localhost for internal checks
+        ]
+    )
 
     # Azure Application Insights (if configured)
     if "APPLICATIONINSIGHTS_CONNECTION_STRING" in os.environ:
