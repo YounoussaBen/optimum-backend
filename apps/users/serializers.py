@@ -679,3 +679,92 @@ class BulkUserImportResponseSerializer(serializers.Serializer):
         child=serializers.DictField(),
         help_text="List of errors with row numbers and details",
     )  # type: ignore[assignment]
+
+
+class GenerateOTPSerializer(serializers.Serializer):
+    """
+    Serializer for OTP generation request.
+    """
+
+    user_id = serializers.UUIDField(help_text="User ID (UUID)")
+    method = serializers.ChoiceField(
+        choices=[("sms", "SMS"), ("email", "Email")],
+        help_text="Delivery method for OTP (sms or email)",
+    )
+
+    def validate_user_id(self, value):
+        """Validate that user exists and is active."""
+        try:
+            User.objects.get(id=value, is_active=True)
+            return str(value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found or inactive") from None
+
+
+class GenerateOTPResponseSerializer(serializers.Serializer):
+    """
+    Serializer for OTP generation response.
+    """
+
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    contact = serializers.CharField(required=False)
+    expires_in = serializers.IntegerField(required=False)
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    """
+    Serializer for OTP verification request.
+    """
+
+    user_id = serializers.UUIDField(help_text="User ID (UUID)")
+    otp_code = serializers.CharField(
+        max_length=6, min_length=6, help_text="6-digit OTP code"
+    )
+
+    def validate_user_id(self, value):
+        """Validate that user exists and is active."""
+        try:
+            User.objects.get(id=value, is_active=True)
+            return str(value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found or inactive") from None
+
+    def validate_otp_code(self, value):
+        """Validate OTP code format."""
+        if not value.isdigit():
+            raise serializers.ValidationError("OTP code must contain only digits")
+        return value
+
+
+class VerifyOTPResponseSerializer(serializers.Serializer):
+    """
+    Serializer for OTP verification response.
+    """
+
+    success = serializers.BooleanField()
+    message = serializers.CharField()
+    access_token = serializers.CharField(required=False)
+    refresh_token = serializers.CharField(required=False)
+    user = serializers.SerializerMethodField(required=False)
+
+    def get_user(self, obj):
+        """Return user information on successful verification."""
+        if obj.get("success") and obj.get("user"):
+            user = obj["user"]
+            return {
+                "id": str(user.id),
+                "name": user.get_full_name(),
+                "email": user.email,
+                "phone": user.phone_number,
+            }
+        return None
+
+
+class OTPErrorResponseSerializer(serializers.Serializer):
+    """
+    Serializer for OTP error responses.
+    """
+
+    success = serializers.BooleanField(default=False)
+    message = serializers.CharField()

@@ -2,6 +2,7 @@ from django.urls import path
 
 from . import views
 from .admin_auth_views import AdminLoginView, AdminLogoutView, TokenRefreshView
+from .otp_views import GenerateOTPView, VerifyOTPView
 
 # App namespace
 app_name = "users"
@@ -39,6 +40,9 @@ patterns = [
         views.BulkUserImportView.as_view(),
         name="bulk-user-import",
     ),
+    # OTP Authentication endpoints
+    path("auth/generate-otp/", GenerateOTPView.as_view(), name="generate-otp"),
+    path("auth/verify-otp/", VerifyOTPView.as_view(), name="verify-otp"),
 ]
 
 urlpatterns = patterns

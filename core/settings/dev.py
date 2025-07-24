@@ -80,6 +80,7 @@ _logging_config = globals().get("LOGGING", {})
 if _logging_config and "handlers" in _logging_config:
     _logging_config["handlers"]["console"]["level"] = "DEBUG"
     _logging_config["loggers"]["apps"]["level"] = "DEBUG"
+    _logging_config["loggers"]["apps"]["handlers"] = ["file", "console"]
     _logging_config["loggers"]["django"]["level"] = "DEBUG"
 
 # Security settings - relaxed for development

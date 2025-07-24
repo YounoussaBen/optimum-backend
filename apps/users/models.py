@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from datetime import timedelta
 
@@ -251,3 +252,140 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.save(update_fields=["auth_faces_count"])
             return True
         return False
+
+
+class OTP(models.Model):
+    """
+    One Time Password model for SMS/Email authentication.
+
+    OTPs are used for user authentication via SMS or email.
+    Each OTP expires after 60 seconds for security.
+    """
+
+    DELIVERY_METHODS = [
+        ("sms", "SMS"),
+        ("email", "Email"),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text="Unique identifier for the OTP",
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="otps",
+        help_text="User this OTP belongs to",
+    )
+
+    code = models.CharField(max_length=6, help_text="6-digit OTP code")
+
+    delivery_method = models.CharField(
+        max_length=5,
+        choices=DELIVERY_METHODS,
+        help_text="Method used to deliver the OTP (SMS or Email)",
+    )
+
+    is_used = models.BooleanField(
+        default=False, help_text="Whether this OTP has been used for authentication"
+    )
+
+    is_expired = models.BooleanField(
+        default=False, help_text="Whether this OTP has expired"
+    )
+
+    created_at = models.DateTimeField(
+        default=timezone.now, help_text="When the OTP was created"
+    )
+
+    expires_at = models.DateTimeField(help_text="When the OTP expires")
+
+    used_at = models.DateTimeField(
+        null=True, blank=True, help_text="When the OTP was used"
+    )
+
+    class Meta:
+        db_table = "users_otp"
+        verbose_name = "OTP"
+        verbose_name_plural = "OTPs"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "code"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["expires_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        """Override save to set expiration time and generate code."""
+        if not self.code:
+            self.code = self._generate_otp_code()
+
+        if not self.expires_at:
+            # OTP expires after 60 seconds
+            self.expires_at = timezone.now() + timedelta(seconds=60)
+
+        super().save(*args, **kwargs)
+
+    def _generate_otp_code(self):
+        """Generate a secure 6-digit OTP code."""
+        return "".join([str(secrets.randbelow(10)) for _ in range(6)])
+
+    def __str__(self):
+        return f"OTP for {self.user.email} via {self.delivery_method} - {self.code}"
+
+    @property
+    def is_valid(self):
+        """Check if OTP is valid (not used, not expired, and within time limit)."""
+        if self.is_used or self.is_expired:
+            return False
+
+        # Check if expired by time
+        if timezone.now() > self.expires_at:
+            self.is_expired = True
+            self.save(update_fields=["is_expired"])
+            return False
+
+        return True
+
+    def mark_as_used(self):
+        """Mark OTP as used."""
+        self.is_used = True
+        self.used_at = timezone.now()
+        self.save(update_fields=["is_used", "used_at"])
+
+    def get_masked_contact(self):
+        """Return masked contact information for display."""
+        if self.delivery_method == "email":
+            email = self.user.email
+            local, domain = email.split("@")
+            if len(local) <= 3:
+                masked_local = local[0] + "*" * (len(local) - 1)
+            else:
+                masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
+            return f"{masked_local}@{domain}"
+
+        elif self.delivery_method == "sms":
+            phone = self.user.phone_number
+            # Remove any non-digit characters for processing
+            digits_only = "".join(filter(str.isdigit, phone))
+
+            if len(digits_only) >= 7:
+                # Show first 3 and last 2 digits, mask the middle
+                visible_start = digits_only[:3]
+                visible_end = digits_only[-2:]
+                masked_middle = "*" * (len(digits_only) - 5)
+                masked_digits = visible_start + masked_middle + visible_end
+
+                # Preserve the original format structure
+                if phone.startswith("+"):
+                    return f"+{masked_digits[:3]} {masked_digits[3:5]} {masked_digits[5:7]} **{masked_digits[-2:]}"
+                else:
+                    return masked_digits
+            else:
+                # For shorter numbers, just mask most digits
+                return phone[:-2] + "**"
+
+        return "***"
