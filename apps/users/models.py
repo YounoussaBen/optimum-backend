@@ -77,6 +77,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_length=1, choices=GENDER_CHOICES, help_text="User's gender"
     )
 
+    profile_picture = models.URLField(
+        blank=True,
+        null=True,
+        max_length=500,
+        help_text="URL to user's profile picture stored in Azure Blob Storage",
+    )
+
     # Authentication Fields
     unique_pin_identifier = models.CharField(
         max_length=9,

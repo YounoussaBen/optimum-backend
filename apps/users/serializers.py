@@ -7,6 +7,12 @@ from django.contrib.auth import authenticate, get_user_model
 from django.db import models
 from rest_framework import serializers
 
+from core.services.storage import (
+    delete_profile_picture,
+    update_profile_picture,
+    upload_profile_picture,
+)
+
 User = get_user_model()
 
 
@@ -29,6 +35,7 @@ class UserListSerializer(serializers.ModelSerializer):
             "unique_pin_identifier",
             "person_id",
             "face_status",
+            "profile_picture",
             "is_active",
             "is_verified",
             "date_joined",
@@ -69,6 +76,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "nationality",
             "gender",
+            "profile_picture",
             "unique_pin_identifier",
             "person_id",
             "face_added",
@@ -104,11 +112,19 @@ class UserCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating new users (admin only).
     Validates all required fields and formats data properly.
+    Supports base64 profile picture upload.
     """
+
+    profile_picture_base64 = serializers.CharField(
+        write_only=True,
+        required=False,
+        help_text="Base64 encoded profile picture image",
+    )
 
     class Meta:
         model = User
         fields = [
+            "id",
             "email",
             "first_name",
             "middle_name",
@@ -117,7 +133,10 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "nationality",
             "gender",
+            "profile_picture",
+            "profile_picture_base64",
         ]
+        read_only_fields = ["id", "profile_picture"]
 
     def validate_email(self, value: str) -> str:
         """Ensure email is unique and properly formatted."""
@@ -173,16 +192,56 @@ class UserCreateSerializer(serializers.ModelSerializer):
             return value.strip().title()
         return value
 
+    def create(self, validated_data):
+        """Create user with optional profile picture upload."""
+        profile_picture_base64 = validated_data.pop("profile_picture_base64", None)
+
+        user = super().create(validated_data)
+
+        # Upload profile picture if provided
+        if profile_picture_base64:
+            try:
+                profile_picture_url = upload_profile_picture(
+                    str(user.id), profile_picture_base64
+                )
+                user.profile_picture = profile_picture_url
+                user.save(update_fields=["profile_picture"])
+            except Exception as e:
+                # Log error but don't fail user creation
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    f"Failed to upload profile picture for user {user.id}: {str(e)}"
+                )
+
+        return user
+
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating user information (admin only).
     Allows updating most fields except authentication-related ones.
+    Supports base64 profile picture upload and removal.
     """
+
+    profile_picture_base64 = serializers.CharField(
+        write_only=True,
+        required=False,
+        help_text="Base64 encoded profile picture image. Pass empty string to remove profile picture.",
+    )
+
+    remove_profile_picture = serializers.BooleanField(
+        write_only=True,
+        required=False,
+        default=False,
+        help_text="Set to true to remove the current profile picture",
+    )
 
     class Meta:
         model = User
         fields = [
+            "id",
             "email",
             "first_name",
             "middle_name",
@@ -191,10 +250,14 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "nationality",
             "gender",
+            "profile_picture",
+            "profile_picture_base64",
+            "remove_profile_picture",
             "is_active",
             "is_verified",
             "verification_expires_at",
         ]
+        read_only_fields = ["id", "profile_picture"]
 
     def validate_email(self, value: str) -> str:
         """Ensure email is unique (excluding current user)."""
@@ -229,6 +292,71 @@ class UserUpdateSerializer(serializers.ModelSerializer):
                 )
         return value
 
+    def update(self, instance, validated_data):
+        """Update user with optional profile picture upload or removal."""
+        profile_picture_base64 = validated_data.pop("profile_picture_base64", None)
+        remove_profile_picture = validated_data.pop("remove_profile_picture", False)
+
+        # Handle profile picture removal
+        if remove_profile_picture:
+            try:
+                if instance.profile_picture:
+                    delete_profile_picture(instance.profile_picture)
+                    validated_data["profile_picture"] = None
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"Removed profile picture for user {instance.id}")
+            except Exception as e:
+                # Log error but don't fail user update
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    f"Failed to remove profile picture for user {instance.id}: {str(e)}"
+                )
+
+        # Handle profile picture update (only if not removing)
+        elif profile_picture_base64:
+            # Support empty string as removal signal
+            if profile_picture_base64.strip() == "":
+                try:
+                    if instance.profile_picture:
+                        delete_profile_picture(instance.profile_picture)
+                        validated_data["profile_picture"] = None
+                        import logging
+
+                        logger = logging.getLogger(__name__)
+                        logger.info(
+                            f"Removed profile picture for user {instance.id} (empty string)"
+                        )
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.error(
+                        f"Failed to remove profile picture for user {instance.id}: {str(e)}"
+                    )
+            else:
+                # Upload new profile picture
+                try:
+                    profile_picture_url = update_profile_picture(
+                        str(instance.id),
+                        instance.profile_picture,
+                        profile_picture_base64,
+                    )
+                    validated_data["profile_picture"] = profile_picture_url
+                except Exception as e:
+                    # Log error but don't fail user update
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    logger.error(
+                        f"Failed to update profile picture for user {instance.id}: {str(e)}"
+                    )
+
+        return super().update(instance, validated_data)
+
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """
@@ -247,6 +375,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "full_name",
             "phone_number",
             "unique_pin_identifier",
+            "profile_picture",
             "face_status",
             "is_verified",
             "date_joined",
@@ -522,9 +651,7 @@ class BulkUserImportSerializer(serializers.Serializer):
             csv_reader = csv.DictReader(io.StringIO(csv_content))
             users_data = []
 
-            for _row_num, row in enumerate(
-                csv_reader, start=2
-            ):  # Start at 2 for header
+            for row in csv_reader:
                 # Remove empty values and strip whitespace
                 user_data = {k.strip(): v.strip() for k, v in row.items() if v.strip()}
 

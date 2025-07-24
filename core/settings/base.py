@@ -227,6 +227,12 @@ AZURE_FACE_API_KEY = get_env("AZURE_FACE_API_KEY", "")
 AZURE_FACE_ENDPOINT = get_env("AZURE_FACE_ENDPOINT", "")
 AZURE_FACE_PERSON_GROUP_ID = get_env("AZURE_FACE_PERSON_GROUP_ID", "optimum")
 
+# Azure Storage Configuration for Profile Pictures
+AZURE_STORAGE_CONNECTION_STRING = get_env("AZURE_STORAGE_CONNECTION_STRING", "")
+AZURE_STORAGE_ACCOUNT_NAME = get_env("AZURE_STORAGE_ACCOUNT_NAME", "")
+AZURE_STORAGE_ACCOUNT_KEY = get_env("AZURE_STORAGE_ACCOUNT_KEY", "")
+AZURE_STORAGE_CONTAINER = get_env("AZURE_STORAGE_CONTAINER", "media")
+
 # CORS settings - will be overridden by environment variable in production
 CORS_ALLOWED_ORIGINS = get_env(
     "CORS_ALLOWED_ORIGINS",
