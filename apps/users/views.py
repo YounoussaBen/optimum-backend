@@ -8,7 +8,7 @@ from django.db.models import Avg, Sum
 from django.utils import timezone
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.generics import (
     CreateAPIView,
     DestroyAPIView,
@@ -22,7 +22,10 @@ from rest_framework.views import APIView
 
 from .permissions import IsAdminUser
 from .serializers import (
+    BulkUserImportResponseSerializer,
+    BulkUserImportSerializer,
     DashboardDataSerializer,
+    DynamicUserCreationSerializer,
     UserCreateSerializer,
     UserDetailSerializer,
     UserListSerializer,
@@ -742,3 +745,98 @@ class AdaptiveLearningStatsView(APIView):
                 {"error": "Failed to retrieve adaptive learning statistics"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class BulkUserImportView(CreateAPIView):
+    """
+    API view for bulk user import from JSON or CSV.
+    Dynamically creates users based on the User model structure.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = BulkUserImportSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Bulk import users",
+        operation_description="Import multiple users from JSON data or CSV file. "
+        "Automatically adapts to User model fields and validates required/optional fields.",
+        request_body=BulkUserImportSerializer,
+        responses={
+            201: BulkUserImportResponseSerializer,
+            400: "Bad Request - Validation errors",
+            401: "Unauthorized - Admin access required",
+        },
+        tags=["User Management"],
+    )
+    def post(self, request, *args, **kwargs):
+        """Import users in bulk from JSON or CSV."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        users_data = serializer.validated_data.get("users_data")
+        csv_file = serializer.validated_data.get("csv_file")
+
+        # Parse CSV if provided
+        if csv_file:
+            try:
+                users_data = BulkUserImportSerializer().parse_csv_data(csv_file)
+                # Validate parsed CSV data using DynamicUserCreationSerializer
+                users_data = [
+                    DynamicUserCreationSerializer(data=user_data).validate(user_data)
+                    for user_data in users_data
+                ]
+            except serializers.ValidationError as e:
+                return Response(
+                    {"error": f"CSV parsing error: {str(e)}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Process user creation
+        created_users = []
+        errors = []
+
+        for index, user_data in enumerate(users_data):
+            try:
+                # Validate and create user
+                user_serializer = DynamicUserCreationSerializer(data=user_data)
+                if user_serializer.is_valid():
+                    user = user_serializer.save()
+                    created_users.append(user)
+
+                    logger.info(
+                        f"Bulk import: Created user {user.email} by admin {request.user.email}"
+                    )
+                else:
+                    errors.append(
+                        {
+                            "row": index + 1,
+                            "data": user_data,
+                            "errors": user_serializer.errors,
+                        }
+                    )
+
+            except Exception as e:
+                errors.append(
+                    {
+                        "row": index + 1,
+                        "data": user_data,
+                        "errors": {"general": [str(e)]},
+                    }
+                )
+                logger.error(f"Bulk import error for row {index + 1}: {str(e)}")
+
+        # Prepare response
+        response_data = {
+            "success_count": len(created_users),
+            "error_count": len(errors),
+            "total_processed": len(users_data),
+            "created_users": UserListSerializer(created_users, many=True).data,
+            "errors": errors,
+        }
+
+        # Return 201 for partial success (if any users were created)
+        # or 400 only if no users were created at all
+        status_code = (
+            status.HTTP_201_CREATED if created_users else status.HTTP_400_BAD_REQUEST
+        )
+        return Response(response_data, status=status_code)

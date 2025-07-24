@@ -33,6 +33,12 @@ patterns = [
         views.AdaptiveLearningStatsView.as_view(),
         name="adaptive-learning-stats",
     ),
+    # Bulk user import endpoint
+    path(
+        "admin/bulk-import/",
+        views.BulkUserImportView.as_view(),
+        name="bulk-user-import",
+    ),
 ]
 
 urlpatterns = patterns

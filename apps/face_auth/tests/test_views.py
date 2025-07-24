@@ -440,3 +440,279 @@ class AddUserFaceViewTest(BaseFaceAuthTestCase):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CompleteUserValidationViewTest(BaseFaceAuthTestCase):
+    """Test CompleteUserValidationView - complete user face setup."""
+
+    @patch("apps.face_auth.views.AzureFaceService")
+    def test_complete_validation_success(self, mock_service):
+        """Successfully complete user validation with all steps."""
+        # Setup mock service
+        mock_service_instance = mock_service.return_value
+        mock_service_instance.create_person.return_value = "new-person-id-123"
+        mock_service_instance.add_person_face.return_value = "face-id-123"
+        mock_service_instance.train_person_group.return_value = {"status": "running"}
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64, self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify response structure
+        self.assertEqual(response.data["user_id"], self.user_no_face.id)
+        self.assertEqual(response.data["person_group_id"], "test-group-id")
+        self.assertEqual(response.data["person_id"], "new-person-id-123")
+        self.assertTrue(response.data["person_created"])
+        self.assertEqual(response.data["images_added"], 2)
+        self.assertTrue(response.data["training_initiated"])
+        self.assertEqual(len(response.data["face_ids"]), 2)
+
+        # Verify user model was updated
+        self.user_no_face.refresh_from_db()
+        self.assertEqual(self.user_no_face.person_id, "new-person-id-123")
+        self.assertTrue(self.user_no_face.face_added)
+
+        # Verify service calls
+        mock_service_instance.create_person.assert_called_once()
+        self.assertEqual(mock_service_instance.add_person_face.call_count, 2)
+        mock_service_instance.train_person_group.assert_called_once_with(
+            "test-group-id"
+        )
+
+    @patch("apps.face_auth.views.AzureFaceService")
+    def test_validation_existing_person(self, mock_service):
+        """Complete validation for user with existing person_id."""
+        # User already has person_id
+        self.user_with_face.person_id = "existing-person-id"
+        self.user_with_face.save()
+
+        mock_service_instance = mock_service.return_value
+        mock_service_instance.add_person_face.return_value = {
+            "persistedFaceId": "face-id-456"
+        }
+        mock_service_instance.train_person_group.return_value = {"status": "running"}
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_with_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify no new person was created
+        self.assertFalse(response.data["person_created"])
+        self.assertEqual(response.data["person_id"], "existing-person-id")
+
+        # Verify service calls
+        mock_service_instance.create_person.assert_not_called()
+        mock_service_instance.add_person_face.assert_called_once()
+
+    @patch("apps.face_auth.views.AzureFaceService")
+    def test_validation_partial_failure(self, mock_service):
+        """Handle partial failures during validation."""
+        mock_service_instance = mock_service.return_value
+        mock_service_instance.create_person.return_value = {
+            "person_id": "new-person-id-789"
+        }
+
+        # First image succeeds, second fails
+        mock_service_instance.add_person_face.side_effect = [
+            {"persistedFaceId": "face-id-success"},
+            AzureFaceAPIError("Failed to add second image"),
+        ]
+
+        # Training also fails
+        mock_service_instance.train_person_group.side_effect = AzureFaceAPIError(
+            "Training failed"
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64, self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(
+            response.status_code, status.HTTP_201_CREATED
+        )  # Partial success
+
+        # Verify partial results
+        self.assertEqual(response.data["images_added"], 1)
+        self.assertFalse(response.data["training_initiated"])
+        self.assertEqual(len(response.data["errors"]), 2)  # Image + training errors
+
+        # User should still be updated since one image succeeded
+        self.user_no_face.refresh_from_db()
+        self.assertTrue(self.user_no_face.face_added)
+
+    def test_validation_user_not_found(self):
+        """Handle validation for non-existent user."""
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(uuid.uuid4()),  # Non-existent user
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_validation_inactive_user(self):
+        """Handle validation for inactive user."""
+        self.user_no_face.is_active = False
+        self.user_no_face.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("apps.face_auth.views.AzureFaceService")
+    def test_validation_complete_failure(self, mock_service):
+        """Handle complete failure when no images can be added."""
+        mock_service_instance = mock_service.return_value
+        mock_service_instance.create_person.return_value = {
+            "person_id": "new-person-id-fail"
+        }
+
+        # All image additions fail
+        mock_service_instance.add_person_face.side_effect = AzureFaceAPIError(
+            "All images failed"
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["images_added"], 0)
+        self.assertIn("Failed to add any face images", response.data["message"])
+
+        # User should not be updated
+        self.user_no_face.refresh_from_db()
+        self.assertFalse(self.user_no_face.face_added)
+
+    def test_validation_invalid_data(self):
+        """Handle validation with invalid request data."""
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        # Missing required fields
+        data = {
+            "user_id": str(self.user_no_face.id),
+            # Missing person_group_id and images
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_validation_empty_images(self):
+        """Handle validation with empty images list."""
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [],  # Empty images list
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_validation_too_many_images(self):
+        """Handle validation with too many images."""
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        # More than 10 images
+        images = [self.sample_image_base64] * 11
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": images,
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_regular_user_cannot_validate(self):
+        """Regular users cannot access complete validation."""
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_user_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unauthenticated_cannot_validate(self):
+        """Unauthenticated users cannot access complete validation."""
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @patch("apps.face_auth.views.AzureFaceService")
+    def test_validation_azure_api_error(self, mock_service):
+        """Handle Azure Face API errors during validation."""
+        mock_service_instance = mock_service.return_value
+        mock_service_instance.create_person.side_effect = AzureFaceAPIError(
+            "Azure service unavailable"
+        )
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.get_admin_token()}")
+        url = reverse("face_auth:complete-user-validation")
+
+        data = {
+            "user_id": str(self.user_no_face.id),
+            "person_group_id": "test-group-id",
+            "images": [self.sample_image_base64],
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertIn("Face API service error", response.data["error"])

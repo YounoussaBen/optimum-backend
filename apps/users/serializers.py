@@ -1,7 +1,10 @@
+import csv
+import io
 from datetime import date
 from typing import Any
 
 from django.contrib.auth import authenticate, get_user_model
+from django.db import models
 from rest_framework import serializers
 
 User = get_user_model()
@@ -398,3 +401,154 @@ class DashboardDataSerializer(serializers.Serializer):
     stats = DashboardStatsSerializer()
     verification_chart = VerificationDataPointSerializer(many=True)
     recent_activities = RecentActivitySerializer(many=True)
+
+
+class DynamicUserCreationSerializer(serializers.ModelSerializer):
+    """
+    Dynamic serializer for bulk user creation.
+    Automatically includes all user-editable fields from the User model,
+    respecting required/optional field definitions.
+    """
+
+    class Meta:
+        model = User
+        fields: list[str] = []  # Will be set dynamically
+        extra_kwargs: dict[str, dict[str, bool]] = {}  # Will be set dynamically
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._setup_dynamic_fields()
+
+    def _setup_dynamic_fields(self):
+        """Dynamically configure fields based on User model introspection."""
+        # Get all model fields
+        model_fields = self.Meta.model._meta.get_fields()
+
+        # Fields to exclude (auto-generated, non-editable, or relations)
+        excluded_fields = {
+            "id",
+            "password",
+            "last_login",
+            "date_joined",
+            "updated_at",
+            "unique_pin_identifier",
+            "groups",
+            "user_permissions",
+            "logentry",
+        }
+
+        # Build field list and extra_kwargs
+        fields: list[str] = []
+        extra_kwargs: dict[str, dict[str, bool]] = {}
+
+        for field in model_fields:
+            # Skip excluded fields and reverse relations
+            if (
+                field.name in excluded_fields
+                or hasattr(field, "related_model")
+                and field.many_to_one is False
+            ):
+                continue
+
+            fields.append(field.name)
+
+            # Determine if field is required
+            field_kwargs = {}
+
+            # Check if field allows blank/null or has default
+            if hasattr(field, "blank") and field.blank:
+                field_kwargs["required"] = False
+            elif hasattr(field, "null") and field.null:
+                field_kwargs["required"] = False
+            elif hasattr(field, "default") and field.default != models.NOT_PROVIDED:
+                field_kwargs["required"] = False
+
+            if field_kwargs:
+                extra_kwargs[field.name] = field_kwargs
+
+        # Update Meta class
+        self.Meta.fields = fields
+        self.Meta.extra_kwargs = extra_kwargs
+
+        # Regenerate fields
+        self._declared_fields = {}
+        self.fields.clear()
+        self.fields.update(self.get_fields())
+
+
+class BulkUserImportSerializer(serializers.Serializer):
+    """
+    Serializer for bulk user import endpoint.
+    Accepts either JSON data or CSV file.
+    """
+
+    # For JSON input
+    users_data = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        help_text="List of user objects to create (JSON format)",
+    )
+
+    # For CSV input
+    csv_file = serializers.FileField(
+        required=False, help_text="CSV file containing user data"
+    )
+
+    def validate(self, attrs):
+        """Ensure either JSON data or CSV file is provided, but not both."""
+        users_data = attrs.get("users_data")
+        csv_file = attrs.get("csv_file")
+
+        if not users_data and not csv_file:
+            raise serializers.ValidationError(
+                "Either 'users_data' (JSON) or 'csv_file' must be provided."
+            )
+
+        if users_data and csv_file:
+            raise serializers.ValidationError(
+                "Provide either 'users_data' (JSON) or 'csv_file', not both."
+            )
+
+        return attrs
+
+    def parse_csv_data(self, csv_file):
+        """Parse CSV file and return list of user data dictionaries."""
+        try:
+            # Read CSV content
+            csv_content = csv_file.read().decode("utf-8")
+            csv_file.seek(0)  # Reset file pointer
+
+            # Parse CSV
+            csv_reader = csv.DictReader(io.StringIO(csv_content))
+            users_data = []
+
+            for _row_num, row in enumerate(
+                csv_reader, start=2
+            ):  # Start at 2 for header
+                # Remove empty values and strip whitespace
+                user_data = {k.strip(): v.strip() for k, v in row.items() if v.strip()}
+
+                if user_data:  # Skip completely empty rows
+                    users_data.append(user_data)
+
+            return users_data
+
+        except UnicodeDecodeError as e:
+            raise serializers.ValidationError("CSV file must be UTF-8 encoded.") from e
+        except Exception as e:
+            raise serializers.ValidationError(
+                f"Error parsing CSV file: {str(e)}"
+            ) from e
+
+
+class BulkUserImportResponseSerializer(serializers.Serializer):
+    """Response serializer for bulk user import."""
+
+    success_count = serializers.IntegerField()
+    error_count = serializers.IntegerField()
+    total_processed = serializers.IntegerField()
+    created_users = UserListSerializer(many=True)
+    errors = serializers.ListField(
+        child=serializers.DictField(),
+        help_text="List of errors with row numbers and details",
+    )  # type: ignore[assignment]

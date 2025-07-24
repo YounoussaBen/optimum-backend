@@ -30,6 +30,8 @@ from .serializers import (
     AddUserFaceSerializer,
     AddUserToPersonGroupResponseSerializer,
     AddUserToPersonGroupSerializer,
+    CompleteUserValidationResponseSerializer,
+    CompleteUserValidationSerializer,
     FaceAuthenticationResponseSerializer,
     FaceAuthenticationSerializer,
     FaceVerificationResponseSerializer,
@@ -558,7 +560,7 @@ class FaceAuthenticationView(CreateAPIView):
 
         pin = serializer.validated_data["pin"]
         confidence_threshold = serializer.validated_data.get(
-            "confidence_threshold", 0.7
+            "confidence_threshold", 0.8
         )
         person_group_id = serializer.validated_data.get("person_group_id")
 
@@ -1084,3 +1086,168 @@ class AddUserFaceView(CreateAPIView):
             return {"image_binary": image_binary}
         else:
             raise ValidationError("No image data provided")
+
+
+class CompleteUserValidationView(CreateAPIView):
+    """
+    Complete user validation endpoint.
+    Adds user to person group, adds face images, and trains the group in one operation.
+    """
+
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = CompleteUserValidationSerializer
+
+    @swagger_auto_schema(
+        operation_summary="Complete user validation setup",
+        operation_description="Complete face validation setup for a user: "
+        "adds user to person group, uploads face images, and initiates training.",
+        request_body=CompleteUserValidationSerializer,
+        responses={
+            201: CompleteUserValidationResponseSerializer,
+            400: "Bad Request - Validation errors",
+            401: "Unauthorized - Admin access required",
+            404: "Not Found - User not found",
+            503: "Service Unavailable - Azure Face API error",
+        },
+        tags=["User Validation"],
+    )
+    def post(self, request, *args, **kwargs):
+        """Complete user validation setup."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_id = serializer.validated_data["user_id"]
+        person_group_id = serializer.validated_data["person_group_id"]
+        images = serializer.validated_data["images"]
+
+        try:
+            # Get user
+            user = User.objects.get(id=user_id, is_active=True)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User not found or inactive"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Initialize Azure Face Service
+        azure_service = AzureFaceService()
+
+        # Track operation results
+        operation_results = {
+            "user_id": user.id,
+            "person_group_id": person_group_id,
+            "person_id": None,
+            "person_created": False,
+            "images_added": 0,
+            "training_initiated": False,
+            "face_ids": [],
+            "errors": [],
+            "message": "",
+        }
+
+        try:
+            # Step 1: Create person in person group if not already exists
+            if not user.person_id:
+                logger.info(
+                    f"Creating person for user {user.id} in group {person_group_id}"
+                )
+
+                person_result = azure_service.create_person(
+                    person_group_id=person_group_id,
+                    name=user.get_full_name(),
+                    user_data=f"user_id:{user.id}",
+                )
+
+                user.person_id = person_result
+                operation_results["person_created"] = True
+                operation_results["person_id"] = user.person_id
+
+                logger.info(f"Created person {user.person_id} for user {user.id}")
+            else:
+                operation_results["person_id"] = user.person_id
+                logger.info(f"User {user.id} already has person_id {user.person_id}")
+
+            # Step 2: Add face images
+            for i, image_base64 in enumerate(images):
+                try:
+                    logger.info(
+                        f"Adding face image {i+1}/{len(images)} for user {user.id}"
+                    )
+
+                    face_result = azure_service.add_person_face(
+                        person_group_id=person_group_id,
+                        person_id=user.person_id,
+                        image_base64=image_base64,
+                    )
+
+                    operation_results["face_ids"].append(face_result)
+                    operation_results["images_added"] += 1
+
+                    logger.info(f"Added face {face_result} for user {user.id}")
+
+                except AzureFaceAPIError as e:
+                    error_msg = f"Failed to add image {i+1}: {str(e)}"
+                    operation_results["errors"].append(error_msg)
+                    logger.warning(
+                        f"Face addition error for user {user.id}, image {i+1}: {str(e)}"
+                    )
+
+            # Step 3: Update user model if faces were added
+            if operation_results["images_added"] > 0:
+                user.face_added = True
+                user.save(update_fields=["person_id", "face_added"])
+
+                logger.info(
+                    f"Updated user {user.id} with person_id and face_added=True"
+                )
+
+            # Step 4: Train person group
+            try:
+                logger.info(f"Initiating training for person group {person_group_id}")
+
+                azure_service.train_person_group(person_group_id)
+                operation_results["training_initiated"] = True
+
+                logger.info(f"Training initiated for person group {person_group_id}")
+
+            except AzureFaceAPIError as e:
+                error_msg = f"Training initiation failed: {str(e)}"
+                operation_results["errors"].append(error_msg)
+                logger.warning(f"Training error for group {person_group_id}: {str(e)}")
+
+            # Determine overall success
+            if operation_results["images_added"] > 0:
+                operation_results["message"] = (
+                    f"Successfully set up user validation: "
+                    f"{operation_results['images_added']} images added, "
+                    f"training {'initiated' if operation_results['training_initiated'] else 'failed'}"
+                )
+
+                # Log successful completion
+                logger.info(
+                    f"Complete user validation successful for user {user.id} by admin {request.user.email}: "
+                    f"{operation_results['images_added']} images, "
+                    f"training={'success' if operation_results['training_initiated'] else 'failed'}"
+                )
+
+                return Response(operation_results, status=status.HTTP_201_CREATED)
+            else:
+                operation_results["message"] = "Failed to add any face images"
+                return Response(operation_results, status=status.HTTP_400_BAD_REQUEST)
+
+        except AzureFaceAPIError as e:
+            logger.error(
+                f"Azure Face API error during user validation for user {user.id}: {str(e)}"
+            )
+            return Response(
+                {"error": "Face API service error", "detail": str(e)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error during user validation for user {user.id}: {str(e)}"
+            )
+            return Response(
+                {"error": "Internal server error"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

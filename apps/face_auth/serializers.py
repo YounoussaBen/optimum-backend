@@ -148,7 +148,7 @@ class FaceAuthenticationSerializer(serializers.Serializer):
     )
 
     confidence_threshold = serializers.FloatField(
-        default=0.7,
+        default=0.8,
         min_value=0.0,
         max_value=1.0,
         help_text="Minimum confidence score for successful verification (0.0-1.0)",
@@ -269,7 +269,7 @@ class FaceVerificationSerializer(serializers.Serializer):
     )
 
     confidence_threshold = serializers.FloatField(
-        default=0.7,
+        default=0.8,
         min_value=0.0,
         max_value=1.0,
         help_text="Minimum confidence score for successful verification (0.0-1.0)",
@@ -439,4 +439,89 @@ class AddUserFaceResponseSerializer(serializers.Serializer):
 
     user_id = serializers.UUIDField()
     persistedFaceId = serializers.CharField()
+    message = serializers.CharField()
+
+
+class CompleteUserValidationSerializer(serializers.Serializer):
+    """
+    Serializer for complete user validation endpoint.
+    Handles adding user to person group, adding faces, and training.
+    """
+
+    user_id = serializers.UUIDField(help_text="UUID of the user to validate")
+
+    person_group_id = serializers.CharField(
+        max_length=64, help_text="Person group ID where user will be added"
+    )
+
+    images = serializers.ListField(
+        child=serializers.CharField(),
+        min_length=1,
+        max_length=10,
+        help_text="List of base64 encoded face images (1-10 images)",
+    )
+
+    def validate_images(self, value):
+        """Validate list of base64 image data."""
+        validated_images = []
+
+        for i, image_data in enumerate(value):
+            # Remove data URL prefix if present
+            if image_data.startswith("data:image/"):
+                try:
+                    image_data = image_data.split(",", 1)[1]
+                except IndexError:
+                    raise serializers.ValidationError(
+                        f"Invalid data URL format for image {i+1}."
+                    ) from None
+
+            # Validate base64 format
+            try:
+                base64.b64decode(image_data)
+            except Exception as e:
+                raise serializers.ValidationError(
+                    f"Invalid base64 image data for image {i+1}."
+                ) from e
+
+            validated_images.append(image_data)
+
+        return validated_images
+
+    def validate_user_id(self, value):
+        """Validate that user exists and is active."""
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        try:
+            User.objects.get(id=value, is_active=True)
+            return value
+        except User.DoesNotExist as e:
+            raise serializers.ValidationError("User not found or inactive.") from e
+
+
+class CompleteUserValidationResponseSerializer(serializers.Serializer):
+    """Response serializer for complete user validation."""
+
+    user_id = serializers.UUIDField()
+    person_group_id = serializers.CharField()
+    person_id = serializers.CharField()
+
+    # Operation results
+    person_created = serializers.BooleanField()
+    images_added = serializers.IntegerField()
+    training_initiated = serializers.BooleanField()
+
+    # Detailed results
+    face_ids = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="List of Azure Face API persistent face IDs",
+    )
+
+    errors = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="List of non-critical errors encountered",
+    )  # type: ignore[assignment]
+
     message = serializers.CharField()

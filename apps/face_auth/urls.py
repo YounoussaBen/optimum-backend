@@ -8,6 +8,7 @@ from django.urls import path
 from .views import (
     AddUserFaceView,
     AddUserToPersonGroupView,
+    CompleteUserValidationView,
     FaceAuthenticationView,
     FaceVerificationView,
     PersonGroupCreateView,
@@ -60,4 +61,10 @@ urlpatterns = [
         name="user-add-to-group",
     ),
     path("users/add-face/", AddUserFaceView.as_view(), name="user-add-face"),
+    # Complete user validation endpoint
+    path(
+        "users/complete-validation/",
+        CompleteUserValidationView.as_view(),
+        name="complete-user-validation",
+    ),
 ]
