@@ -67,6 +67,26 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     nationality = models.CharField(max_length=50, help_text="User's nationality")
 
+    # Address Information
+    address = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="User's street address (optional)",
+    )
+
+    city = models.CharField(
+        max_length=100, blank=True, null=True, help_text="User's city (optional)"
+    )
+
+    postal_code = models.CharField(
+        max_length=20, blank=True, null=True, help_text="User's postal code (optional)"
+    )
+
+    country = models.CharField(
+        max_length=100, blank=True, null=True, help_text="User's country (optional)"
+    )
+
     GENDER_CHOICES = [
         ("M", "Male"),
         ("F", "Female"),
