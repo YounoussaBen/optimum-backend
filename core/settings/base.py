@@ -233,6 +233,15 @@ AZURE_STORAGE_ACCOUNT_NAME = get_env("AZURE_STORAGE_ACCOUNT_NAME", "")
 AZURE_STORAGE_ACCOUNT_KEY = get_env("AZURE_STORAGE_ACCOUNT_KEY", "")
 AZURE_STORAGE_CONTAINER = get_env("AZURE_STORAGE_CONTAINER", "media")
 
+# Azure Communication Services Configuration
+AZURE_COMMUNICATION_CONNECTION_STRING = get_env(
+    "AZURE_COMMUNICATION_CONNECTION_STRING", ""
+)
+AZURE_EMAIL_FROM_ADDRESS = get_env(
+    "AZURE_EMAIL_FROM_ADDRESS", "DoNotReply@azurecomm.net"
+)
+AZURE_SMS_FROM_NUMBER = get_env("AZURE_SMS_FROM_NUMBER", "")
+
 # CORS settings - will be overridden by environment variable in production
 CORS_ALLOWED_ORIGINS = get_env(
     "CORS_ALLOWED_ORIGINS",
