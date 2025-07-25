@@ -47,7 +47,7 @@ class GenerateOTPView(CreateAPIView):
             404: OTPErrorResponseSerializer,
             500: OTPErrorResponseSerializer,
         },
-        tags=["OTP Authentication"],
+        tags=["Authentication & Authorization"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -153,7 +153,7 @@ class VerifyOTPView(CreateAPIView):
             404: OTPErrorResponseSerializer,
             500: OTPErrorResponseSerializer,
         },
-        tags=["OTP Authentication"],
+        tags=["Authentication & Authorization"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)

@@ -66,7 +66,7 @@ class PersonGroupCreateView(CreateAPIView):
             401: "Unauthorized - Admin access required",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Person Group Management"],
+        tags=["Face Admin (Person Groups)"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -128,7 +128,7 @@ class PersonGroupListView(ListAPIView):
             401: "Unauthorized - Admin access required",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Person Group Management"],
+        tags=["Face Admin (Person Groups)"],
     )
     def get(self, request, *args, **kwargs):
         """List all person groups."""
@@ -180,7 +180,7 @@ class PersonGroupInfoView(RetrieveAPIView):
             404: "Not Found - Person group does not exist",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Person Group Management"],
+        tags=["Face Admin (Person Groups)"],
     )
     def get(self, request, *args, **kwargs):
         """Get person group information."""
@@ -242,7 +242,7 @@ class PersonGroupDeleteView(DestroyAPIView):
             404: "Not Found - Person group does not exist",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Person Group Management"],
+        tags=["Face Admin (Person Groups)"],
     )
     def delete(self, request, *args, **kwargs):
         """Delete person group."""
@@ -311,7 +311,7 @@ class PersonGroupTrainView(CreateAPIView):
             404: "Not Found - Person group does not exist",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Person Group Management"],
+        tags=["Face Admin (Person Groups)"],
     )
     def post(self, request, *args, **kwargs):
         """Start training for a person group."""
@@ -382,7 +382,7 @@ class PersonGroupTrainingStatusView(RetrieveAPIView):
             404: "Not Found - Person group does not exist",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Person Group Management"],
+        tags=["Face Admin (Person Groups)"],
     )
     def get(self, request, *args, **kwargs):
         """Get person group training status."""
@@ -438,7 +438,7 @@ class AddUserToPersonGroupView(CreateAPIView):
             404: "Not Found - User not found",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["User Management"],
+        tags=["Face Authentication"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -548,7 +548,7 @@ class FaceAuthenticationView(CreateAPIView):
             404: "Not Found - User not found",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Authentication & Verification"],
+        tags=["Face Authentication"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -805,7 +805,7 @@ class FaceVerificationView(CreateAPIView):
             403: "Forbidden - Cannot verify other users",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["Authentication & Verification"],
+        tags=["Face Authentication"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -989,7 +989,7 @@ class AddUserFaceView(CreateAPIView):
             404: "Not Found - User not found",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["User Management"],
+        tags=["Face Authentication"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -1109,7 +1109,7 @@ class CompleteUserValidationView(CreateAPIView):
             404: "Not Found - User not found",
             503: "Service Unavailable - Azure Face API error",
         },
-        tags=["User Validation"],
+        tags=["Face Authentication"],
     )
     def post(self, request, *args, **kwargs):
         """Complete user validation setup."""

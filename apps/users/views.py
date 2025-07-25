@@ -152,6 +152,7 @@ class AdminUserVerificationView(CreateAPIView):
         operation_summary="Verify or unverify user",
         operation_description="Admin endpoint to verify/unverify a user. "
         "Verified users get a expiration timer and must complete monthly verification.",
+        tags=["Admin Dashboard & Analytics"],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
@@ -185,7 +186,6 @@ class AdminUserVerificationView(CreateAPIView):
             404: "Not Found - User not found",
             401: "Unauthorized - Admin access required",
         },
-        tags=["User Management"],
     )
     def post(self, request, *args, **kwargs):
         """Verify or unverify a user with proper expiration handling."""
@@ -256,6 +256,7 @@ class UserDeleteView(DestroyAPIView):
     @swagger_auto_schema(
         operation_summary="Delete user",
         operation_description="Delete a user account and clean up Azure Face API data. Admin access required.",
+        tags=["User Management"],
         responses={
             204: "User deleted successfully",
             400: "Bad Request - Validation errors",
@@ -263,7 +264,6 @@ class UserDeleteView(DestroyAPIView):
             404: "Not Found - User not found",
             500: "Internal Server Error - Cleanup failed",
         },
-        tags=["User Management"],
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
@@ -426,11 +426,11 @@ class DashboardStatsView(APIView):
     @swagger_auto_schema(
         operation_summary="Get dashboard statistics",
         operation_description="Retrieve dashboard statistics including user counts, verification data, and recent activities. Admin access required.",
+        tags=["Admin Dashboard & Analytics"],
         responses={
             200: DashboardDataSerializer,
             401: "Unauthorized - Admin access required",
         },
-        tags=["Dashboard"],
     )
     def get(self, request, *args, **kwargs):
         """Get complete dashboard data."""
@@ -606,6 +606,7 @@ class AdaptiveLearningStatsView(APIView):
     @swagger_auto_schema(
         operation_summary="Get adaptive learning statistics",
         operation_description="Retrieve statistics about the adaptive face learning system. Admin access required.",
+        tags=["Admin Dashboard & Analytics"],
         responses={
             200: openapi.Schema(
                 type=openapi.TYPE_OBJECT,
@@ -651,7 +652,6 @@ class AdaptiveLearningStatsView(APIView):
             ),
             401: "Unauthorized - Admin access required",
         },
-        tags=["Dashboard"],
     )
     def get(self, request, *args, **kwargs):
         """Get comprehensive adaptive learning statistics."""
@@ -760,13 +760,13 @@ class BulkUserImportView(CreateAPIView):
         operation_summary="Bulk import users",
         operation_description="Import multiple users from JSON data or CSV file. "
         "Automatically adapts to User model fields and validates required/optional fields.",
+        tags=["Admin Dashboard & Analytics"],
         request_body=BulkUserImportSerializer,
         responses={
             201: BulkUserImportResponseSerializer,
             400: "Bad Request - Validation errors",
             401: "Unauthorized - Admin access required",
         },
-        tags=["User Management"],
     )
     def post(self, request, *args, **kwargs):
         """Import users in bulk from JSON or CSV."""

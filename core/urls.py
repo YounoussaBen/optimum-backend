@@ -69,6 +69,7 @@ urlpatterns = [
     # API endpoints
     path("api/", include("apps.users.urls")),
     path("api/", include("apps.face_auth.urls")),
+    path("api/", include("apps.proof_of_life.urls")),
     path("api/", include(router.urls)),
     # Health check endpoint
     path("health/", include("core.health_urls")),

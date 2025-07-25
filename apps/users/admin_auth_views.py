@@ -40,7 +40,7 @@ class AdminLoginView(CreateAPIView):
             400: "Bad Request - Invalid credentials",
             401: "Unauthorized - Access denied",
         },
-        tags=["Admin Authentication"],
+        tags=["Authentication & Authorization"],
     )
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -95,7 +95,7 @@ class AdminLogoutView(CreateAPIView):
             400: "Bad Request - Invalid token",
             401: "Unauthorized - Admin access required",
         },
-        tags=["Admin Authentication"],
+        tags=["Authentication & Authorization"],
     )
     def post(self, request, *args, **kwargs):
         """Logout admin user by blacklisting refresh token."""
@@ -145,7 +145,7 @@ class TokenRefreshView(CreateAPIView):
             400: "Bad Request - Invalid token",
             401: "Unauthorized - Token expired",
         },
-        tags=["Admin Authentication"],
+        tags=["Authentication & Authorization"],
     )
     def post(self, request, *args, **kwargs):
         """Refresh access token using refresh token."""
