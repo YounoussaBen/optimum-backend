@@ -8,13 +8,13 @@ app_name = "proof_of_life"
 patterns = [
     # User-facing proof of life endpoints
     path(
-        "proof-of-life/status/<uuid:user_id>/",
+        "proof-of-life/status/",
         views.ProofOfLifeStatusView.as_view(),
         name="status",
     ),
     # Two-step verification process
     path(
-        "proof-of-life/verify/<uuid:user_id>/",
+        "proof-of-life/verify/",
         views.ProofOfLifeVerificationView.as_view(),
         name="verification",  # Step 1: Face verification
     ),
@@ -29,7 +29,7 @@ patterns = [
         name="otp_verify",  # Step 2B: Verify OTP and complete
     ),
     path(
-        "proof-of-life/history/<uuid:user_id>/",
+        "proof-of-life/history/",
         views.ProofOfLifeHistoryView.as_view(),
         name="history",
     ),

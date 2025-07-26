@@ -15,6 +15,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Load environment variables from .env file
 load_dotenv(BASE_DIR / ".env")
 
+# Initialize Sentry SDK (optional import for pre-commit compatibility)
+try:
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn="https://bbd410c1067ba092d4078e80ced1f8bf@o4508625252646912.ingest.us.sentry.io/4509734485688320",
+        # Add data like request headers and IP for users,
+        # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+        send_default_pii=True,
+    )
+except ImportError:
+    # Sentry not available - this is fine for development/pre-commit
+    pass
+
 # Create logs directory if it doesn't exist - MOVED UP BEFORE LOGGING CONFIG
 os.makedirs(BASE_DIR / "logs", exist_ok=True)
 
@@ -48,6 +62,14 @@ SECRET_KEY = get_env("SECRET_KEY", "django-insecure-default-key-change-in-produc
 DEBUG = get_env("DEBUG", False, bool)
 
 ALLOWED_HOSTS = get_env("ALLOWED_HOSTS", [], list)
+
+# Proof of Life default settings
+PROOF_OF_LIFE_MIN_CONFIDENCE_SCORE = get_env(
+    "PROOF_OF_LIFE_MIN_CONFIDENCE_SCORE", "0.80", str
+)
+PROOF_OF_LIFE_MIN_LIVENESS_SCORE = get_env(
+    "PROOF_OF_LIFE_MIN_LIVENESS_SCORE", "0.70", str
+)
 
 # Application definition
 DJANGO_APPS = [

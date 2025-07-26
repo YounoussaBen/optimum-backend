@@ -46,29 +46,10 @@ class ProofOfLifeStatusView(APIView):
             200: ProofOfLifeStatusResponseSerializer,
             404: ProofOfLifeErrorResponseSerializer,
         },
-        manual_parameters=[
-            openapi.Parameter(
-                "user_id",
-                openapi.IN_PATH,
-                description="User UUID",
-                type=openapi.TYPE_STRING,
-                format=openapi.FORMAT_UUID,
-            )
-        ],
     )
-    def get(self, request, user_id):
-        """Get proof of life status for user by ID."""
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response(
-                {
-                    "success": False,
-                    "message": "User not found",
-                    "error_code": "USER_NOT_FOUND",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
+    def get(self, request):
+        """Get proof of life status for authenticated user."""
+        user = request.user
 
         # Get user's most recent verification
         latest_verification = (
@@ -149,29 +130,10 @@ class ProofOfLifeVerificationView(APIView):
             404: ProofOfLifeErrorResponseSerializer,
             409: ProofOfLifeErrorResponseSerializer,
         },
-        manual_parameters=[
-            openapi.Parameter(
-                "user_id",
-                openapi.IN_PATH,
-                description="User UUID",
-                type=openapi.TYPE_STRING,
-                format=openapi.FORMAT_UUID,
-            )
-        ],
     )
-    def post(self, request, user_id):
+    def post(self, request):
         """Submit face recognition for proof of life verification."""
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response(
-                {
-                    "success": False,
-                    "message": "User not found",
-                    "error_code": "USER_NOT_FOUND",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        user = request.user
 
         # Validate request data
         serializer = ProofOfLifeVerificationRequestSerializer(data=request.data)
@@ -195,7 +157,7 @@ class ProofOfLifeVerificationView(APIView):
         confidence_score = validated_data["confidence_score"]
         liveness_score = validated_data["liveness_score"]
         device_info = validated_data["device_info"]
-        verification_timestamp = validated_data["verification_timestamp"]
+        verification_timestamp = timezone.now()  # Use current server time
 
         # Get client IP and user agent for audit logging
         ip_address = self._get_client_ip(request)
@@ -631,13 +593,6 @@ class ProofOfLifeHistoryView(APIView):
         },
         manual_parameters=[
             openapi.Parameter(
-                "user_id",
-                openapi.IN_PATH,
-                description="User UUID",
-                type=openapi.TYPE_STRING,
-                format=openapi.FORMAT_UUID,
-            ),
-            openapi.Parameter(
                 "limit",
                 openapi.IN_QUERY,
                 description="Number of records to return (default: 10, max: 100)",
@@ -653,19 +608,9 @@ class ProofOfLifeHistoryView(APIView):
             ),
         ],
     )
-    def get(self, request, user_id):
-        """Get verification history for user."""
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response(
-                {
-                    "success": False,
-                    "message": "User not found",
-                    "error_code": "USER_NOT_FOUND",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
+    def get(self, request):
+        """Get verification history for authenticated user."""
+        user = request.user
 
         # Get pagination parameters
         limit = min(int(request.query_params.get("limit", 10)), 100)

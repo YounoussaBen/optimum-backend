@@ -45,9 +45,16 @@ def api_root(request):
     return render(request, "index.html")
 
 
+def trigger_error(request):
+    """Sentry debug endpoint to test error reporting"""
+    return 1 / 0
+
+
 urlpatterns = [
     # Root endpoint
     path("", api_root, name="api_root"),
+    # Sentry debug endpoint
+    path("sentry-debug/", trigger_error, name="sentry_debug"),
     # Swagger/OpenAPI endpoints
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",

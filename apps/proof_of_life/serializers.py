@@ -40,7 +40,6 @@ class ProofOfLifeStatusResponseSerializer(serializers.Serializer):
 class ProofOfLifeVerificationRequestSerializer(serializers.Serializer):
     """Serializer for proof of life verification requests."""
 
-    user_id = serializers.UUIDField()
     confidence_score = serializers.DecimalField(
         max_digits=4,
         decimal_places=3,
@@ -53,17 +52,7 @@ class ProofOfLifeVerificationRequestSerializer(serializers.Serializer):
         min_value=Decimal("0.000"),
         max_value=Decimal("1.000"),
     )
-    verification_timestamp = serializers.DateTimeField()
     device_info = DeviceInfoSerializer()
-
-    def validate(self, data):
-        """Validate that the user exists."""
-        try:
-            user = User.objects.get(id=data["user_id"])
-            data["user"] = user
-        except User.DoesNotExist:
-            raise serializers.ValidationError("User not found") from None
-        return data
 
 
 class ProofOfLifeVerificationResponseSerializer(serializers.Serializer):

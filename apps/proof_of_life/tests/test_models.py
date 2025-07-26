@@ -127,13 +127,13 @@ class ProofOfLifeVerificationModelTest(ProofOfLifeModelsTestCase):
 
         # Failed verification - low confidence
         verification = self.create_verification(
-            confidence_score=Decimal("0.80"), liveness_score=Decimal("0.85")
+            confidence_score=Decimal("0.75"), liveness_score=Decimal("0.85")
         )
         self.assertFalse(verification.is_verification_successful)
 
         # Failed verification - low liveness
         verification = self.create_verification(
-            confidence_score=Decimal("0.90"), liveness_score=Decimal("0.75")
+            confidence_score=Decimal("0.90"), liveness_score=Decimal("0.65")
         )
         self.assertFalse(verification.is_verification_successful)
 
@@ -282,7 +282,7 @@ class ProofOfLifePendingVerificationModelTest(ProofOfLifeModelsTestCase):
 
         # Failed verification
         pending = self.create_pending_verification(
-            confidence_score=Decimal("0.80"), liveness_score=Decimal("0.75")
+            confidence_score=Decimal("0.75"), liveness_score=Decimal("0.65")
         )
         self.assertFalse(pending.is_face_verification_successful)
 
@@ -334,7 +334,7 @@ class ProofOfLifePendingVerificationModelTest(ProofOfLifeModelsTestCase):
     def test_convert_to_full_verification_insufficient_scores(self):
         """Test conversion fails if scores are insufficient."""
         pending = self.create_pending_verification(
-            confidence_score=Decimal("0.80"), liveness_score=Decimal("0.75")
+            confidence_score=Decimal("0.75"), liveness_score=Decimal("0.65")
         )
 
         with self.assertRaises(ValueError) as context:
@@ -356,8 +356,8 @@ class ProofOfLifeSettingsModelTest(TestCase):
         """Test that only one settings record can exist."""
         # Create first settings
         settings1 = ProofOfLifeSettings.objects.create(
-            minimum_confidence_score=Decimal("0.85"),
-            minimum_liveness_score=Decimal("0.80"),
+            minimum_confidence_score=Decimal("0.80"),
+            minimum_liveness_score=Decimal("0.70"),
         )
 
         # Try to create second settings - should update first instead
@@ -383,8 +383,8 @@ class ProofOfLifeSettingsModelTest(TestCase):
         settings = ProofOfLifeSettings.get_settings()
 
         self.assertIsNotNone(settings)
-        self.assertEqual(settings.minimum_confidence_score, Decimal("0.85"))
-        self.assertEqual(settings.minimum_liveness_score, Decimal("0.80"))
+        self.assertEqual(settings.minimum_confidence_score, Decimal("0.80"))
+        self.assertEqual(settings.minimum_liveness_score, Decimal("0.70"))
         self.assertEqual(settings.verification_interval_days, 30)
 
     def test_get_settings_returns_existing(self):

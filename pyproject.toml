@@ -24,6 +24,7 @@ dependencies = [
     "python-json-logger>=3.3.0",
     "redis>=5.0.0",
     "requests>=2.32.4",
+    "sentry-sdk[django]>=2.33.2",
     "uvicorn>=0.32.1",
     "whitenoise>=6.9.0",
 ]

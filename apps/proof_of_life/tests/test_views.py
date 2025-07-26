@@ -2,7 +2,6 @@
 Tests for proof of life views.
 """
 
-import uuid
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -68,10 +67,8 @@ class BaseProofOfLifeTestCase(TestCase):
 
         # Default verification data
         self.verification_data = {
-            "user_id": str(self.user.id),
             "confidence_score": "0.90",
             "liveness_score": "0.85",
-            "verification_timestamp": timezone.now().isoformat(),
             "device_info": self.device_info,
         }
 
@@ -150,7 +147,7 @@ class ProofOfLifeStatusViewTest(BaseProofOfLifeTestCase):
     def test_get_status_no_verification(self):
         """Test getting status when user has no verifications."""
         self.authenticate_user()
-        url = reverse("proof_of_life:status", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:status")
 
         response = self.client.get(url)
 
@@ -166,7 +163,7 @@ class ProofOfLifeStatusViewTest(BaseProofOfLifeTestCase):
         """Test getting status with current verification."""
         self.authenticate_user()
         self.create_verification()
-        url = reverse("proof_of_life:status", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:status")
 
         response = self.client.get(url)
 
@@ -186,7 +183,7 @@ class ProofOfLifeStatusViewTest(BaseProofOfLifeTestCase):
             verification_date=past_date,
             next_due_date=timezone.now() - timedelta(days=2),
         )
-        url = reverse("proof_of_life:status", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:status")
 
         response = self.client.get(url)
 
@@ -204,7 +201,7 @@ class ProofOfLifeStatusViewTest(BaseProofOfLifeTestCase):
             verification_date=past_date,
             next_due_date=timezone.now() - timedelta(days=5),
         )
-        url = reverse("proof_of_life:status", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:status")
 
         response = self.client.get(url)
 
@@ -214,22 +211,9 @@ class ProofOfLifeStatusViewTest(BaseProofOfLifeTestCase):
         self.assertEqual(data["status"], "blocked")
         self.assertTrue(data["is_overdue"])
 
-    def test_get_status_user_not_found(self):
-        """Test getting status for non-existent user."""
-        self.authenticate_user()
-        fake_user_id = uuid.uuid4()
-        url = reverse("proof_of_life:status", kwargs={"user_id": fake_user_id})
-
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        data = response.json()
-        self.assertFalse(data["success"])
-        self.assertEqual(data["error_code"], "USER_NOT_FOUND")
-
     def test_get_status_unauthorized(self):
         """Test getting status without authentication."""
-        url = reverse("proof_of_life:status", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:status")
 
         response = self.client.get(url)
 
@@ -242,7 +226,7 @@ class ProofOfLifeVerificationViewTest(BaseProofOfLifeTestCase):
     def test_submit_verification_success(self):
         """Test successful face verification submission."""
         self.authenticate_user()
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
 
         response = self.client.post(url, self.verification_data, format="json")
 
@@ -263,11 +247,11 @@ class ProofOfLifeVerificationViewTest(BaseProofOfLifeTestCase):
     def test_submit_verification_insufficient_confidence(self):
         """Test verification with insufficient confidence score."""
         self.authenticate_user()
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
 
         # Low confidence score
         data = self.verification_data.copy()
-        data["confidence_score"] = "0.80"  # Below 0.85 minimum
+        data["confidence_score"] = "0.75"  # Below 0.80 minimum
 
         response = self.client.post(url, data, format="json")
 
@@ -280,11 +264,11 @@ class ProofOfLifeVerificationViewTest(BaseProofOfLifeTestCase):
     def test_submit_verification_insufficient_liveness(self):
         """Test verification with insufficient liveness score."""
         self.authenticate_user()
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
 
         # Low liveness score
         data = self.verification_data.copy()
-        data["liveness_score"] = "0.75"  # Below 0.80 minimum
+        data["liveness_score"] = "0.65"  # Below 0.70 minimum
 
         response = self.client.post(url, data, format="json")
 
@@ -300,7 +284,7 @@ class ProofOfLifeVerificationViewTest(BaseProofOfLifeTestCase):
         # Create recent verification
         self.create_verification(verification_date=timezone.now() - timedelta(days=15))
 
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
         response = self.client.post(url, self.verification_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
@@ -311,7 +295,7 @@ class ProofOfLifeVerificationViewTest(BaseProofOfLifeTestCase):
     def test_submit_verification_invalid_data(self):
         """Test verification with invalid request data."""
         self.authenticate_user()
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
 
         # Missing required fields
         invalid_data = {"confidence_score": "0.90"}
@@ -323,19 +307,6 @@ class ProofOfLifeVerificationViewTest(BaseProofOfLifeTestCase):
         self.assertFalse(data["success"])
         self.assertEqual(data["error_code"], "INVALID_REQUEST")
 
-    def test_submit_verification_user_not_found(self):
-        """Test verification for non-existent user."""
-        self.authenticate_user()
-        fake_user_id = uuid.uuid4()
-        url = reverse("proof_of_life:verification", kwargs={"user_id": fake_user_id})
-
-        response = self.client.post(url, self.verification_data, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        data = response.json()
-        self.assertFalse(data["success"])
-        self.assertEqual(data["error_code"], "USER_NOT_FOUND")
-
     def test_submit_verification_clears_existing_pending(self):
         """Test that new verification clears existing pending verifications."""
         self.authenticate_user()
@@ -343,7 +314,7 @@ class ProofOfLifeVerificationViewTest(BaseProofOfLifeTestCase):
         # Create existing pending verification
         existing_pending = self.create_pending_verification()
 
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
         response = self.client.post(url, self.verification_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -625,7 +596,7 @@ class ProofOfLifeHistoryViewTest(BaseProofOfLifeTestCase):
                 verification_date=timezone.now() - timedelta(days=i * 30)
             )
 
-        url = reverse("proof_of_life:history", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:history")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -645,7 +616,7 @@ class ProofOfLifeHistoryViewTest(BaseProofOfLifeTestCase):
                 verification_date=timezone.now() - timedelta(days=i * 30)
             )
 
-        url = reverse("proof_of_life:history", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:history")
         response = self.client.get(url, {"limit": 10, "offset": 0})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -655,24 +626,11 @@ class ProofOfLifeHistoryViewTest(BaseProofOfLifeTestCase):
         self.assertEqual(data["total"], 15)
         self.assertTrue(data["has_more"])
 
-    def test_get_history_user_not_found(self):
-        """Test getting history for non-existent user."""
-        self.authenticate_user()
-        fake_user_id = uuid.uuid4()
-        url = reverse("proof_of_life:history", kwargs={"user_id": fake_user_id})
-
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        data = response.json()
-        self.assertFalse(data["success"])
-        self.assertEqual(data["error_code"], "USER_NOT_FOUND")
-
     def test_get_history_no_verifications(self):
         """Test getting history when user has no verifications."""
         self.authenticate_user()
 
-        url = reverse("proof_of_life:history", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:history")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -765,7 +723,7 @@ class ProofOfLifeAuditLoggingTest(BaseProofOfLifeTestCase):
         """Test that verification attempts are logged."""
         self.authenticate_user()
 
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
         response = self.client.post(url, self.verification_data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -808,9 +766,9 @@ class ProofOfLifeAuditLoggingTest(BaseProofOfLifeTestCase):
         self.authenticate_user()
 
         # Submit verification with insufficient scores
-        url = reverse("proof_of_life:verification", kwargs={"user_id": self.user.id})
+        url = reverse("proof_of_life:verification")
         data = self.verification_data.copy()
-        data["confidence_score"] = "0.80"  # Below minimum
+        data["confidence_score"] = "0.75"  # Below minimum
 
         response = self.client.post(url, data, format="json")
 

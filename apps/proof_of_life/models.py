@@ -143,11 +143,8 @@ class ProofOfLifePendingVerification(models.Model):
 
     def _generate_session_token(self):
         """Generate a unique session token."""
-        timestamp = (
-            int(self.face_verification_timestamp.timestamp())
-            if self.face_verification_timestamp
-            else int(timezone.now().timestamp())
-        )
+        # Always use current timestamp to ensure uniqueness
+        timestamp = int(timezone.now().timestamp())
         return f"polvf_{self.user.id.hex[:8]}_{timestamp}"
 
     @property
@@ -348,9 +345,11 @@ class ProofOfLifeVerification(models.Model):
     @property
     def is_verification_successful(self):
         """Check if verification meets minimum requirements."""
-        return self.confidence_score >= Decimal(
-            "0.85"
-        ) and self.liveness_score >= Decimal("0.80")
+        settings = ProofOfLifeSettings.get_settings()
+        return (
+            self.confidence_score >= settings.minimum_confidence_score
+            and self.liveness_score >= settings.minimum_liveness_score
+        )
 
     @property
     def days_until_due(self):
@@ -410,7 +409,7 @@ class ProofOfLifeSettings(models.Model):
     minimum_confidence_score = models.DecimalField(
         max_digits=4,
         decimal_places=3,
-        default=Decimal("0.85"),
+        default=Decimal("0.80"),
         validators=[
             MinValueValidator(Decimal("0.000")),
             MaxValueValidator(Decimal("1.000")),
@@ -421,7 +420,7 @@ class ProofOfLifeSettings(models.Model):
     minimum_liveness_score = models.DecimalField(
         max_digits=4,
         decimal_places=3,
-        default=Decimal("0.80"),
+        default=Decimal("0.70"),
         validators=[
             MinValueValidator(Decimal("0.000")),
             MaxValueValidator(Decimal("1.000")),
@@ -493,18 +492,24 @@ class ProofOfLifeSettings(models.Model):
     @classmethod
     def get_settings(cls):
         """Get current settings, creating default if none exist."""
-        settings, created = cls.objects.get_or_create(
+        from django.conf import settings
+
+        settings_obj, created = cls.objects.get_or_create(
             id=1,
             defaults={
-                "minimum_confidence_score": Decimal("0.85"),
-                "minimum_liveness_score": Decimal("0.80"),
+                "minimum_confidence_score": Decimal(
+                    settings.PROOF_OF_LIFE_MIN_CONFIDENCE_SCORE
+                ),
+                "minimum_liveness_score": Decimal(
+                    settings.PROOF_OF_LIFE_MIN_LIVENESS_SCORE
+                ),
                 "verification_interval_days": 30,
                 "grace_period_days": 3,
                 "first_reminder_days": 5,
                 "urgent_reminder_days": 1,
             },
         )
-        return settings
+        return settings_obj
 
 
 class ProofOfLifeAuditLog(models.Model):
