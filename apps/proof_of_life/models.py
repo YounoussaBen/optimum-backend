@@ -498,10 +498,10 @@ class ProofOfLifeSettings(models.Model):
             id=1,
             defaults={
                 "minimum_confidence_score": Decimal(
-                    settings.PROOF_OF_LIFE_MIN_CONFIDENCE_SCORE
+                    str(settings.PROOF_OF_LIFE_MIN_CONFIDENCE_SCORE)
                 ),
                 "minimum_liveness_score": Decimal(
-                    settings.PROOF_OF_LIFE_MIN_LIVENESS_SCORE
+                    str(settings.PROOF_OF_LIFE_MIN_LIVENESS_SCORE)
                 ),
                 "verification_interval_days": 30,
                 "grace_period_days": 3,

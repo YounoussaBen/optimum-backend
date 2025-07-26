@@ -62,15 +62,16 @@ class ProofOfLifeStatusView(APIView):
         settings = ProofOfLifeSettings.get_settings()
 
         if not latest_verification:
-            # User has never verified - they need to verify now
+            # User has never verified - give them grace period to start
+            next_due_date = timezone.now() + timedelta(days=settings.grace_period_days)
             response_data = {
                 "success": True,
-                "message": "No verification found - verification required",
-                "status": "overdue",
-                "next_due_date": None,
+                "message": "Welcome! Please complete your first verification within the grace period",
+                "status": "due_soon",
+                "next_due_date": next_due_date,
                 "last_verification_date": None,
-                "days_until_due": -999,  # Very overdue
-                "is_overdue": True,
+                "days_until_due": settings.grace_period_days,
+                "is_overdue": False,
                 "grace_period_days": settings.grace_period_days,
             }
         else:

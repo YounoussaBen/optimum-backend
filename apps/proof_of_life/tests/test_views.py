@@ -154,9 +154,9 @@ class ProofOfLifeStatusViewTest(BaseProofOfLifeTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertTrue(data["success"])
-        self.assertEqual(data["status"], "overdue")
-        self.assertTrue(data["is_overdue"])
-        self.assertIsNone(data["next_due_date"])
+        self.assertEqual(data["status"], "due_soon")
+        self.assertFalse(data["is_overdue"])
+        self.assertIsNotNone(data["next_due_date"])
         self.assertIsNone(data["last_verification_date"])
 
     def test_get_status_with_current_verification(self):

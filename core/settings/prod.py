@@ -166,6 +166,7 @@ if "WEBSITE_HOSTNAME" in os.environ:
     ALLOWED_HOSTS.extend(
         [
             "169.254.130.6",  # Azure internal load balancer
+            "169.254.131.4",  # Azure internal load balancer (additional)
             "127.0.0.1",  # Localhost for internal checks
         ]
     )
