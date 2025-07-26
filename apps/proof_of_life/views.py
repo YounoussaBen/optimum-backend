@@ -271,11 +271,30 @@ class ProofOfLifeVerificationView(APIView):
 
     def _get_client_ip(self, request):
         """Extract client IP address from request."""
+        # Try multiple headers in order of preference
+        ip = None
+
+        # X-Forwarded-For header (most common for load balancers)
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]
-        else:
+            ip = x_forwarded_for.split(",")[0].strip()
+
+        # Client-IP header (sometimes used by proxies)
+        if not ip:
+            client_ip = request.META.get("HTTP_CLIENT_IP")
+            if client_ip:
+                ip = client_ip.strip()
+
+        # Remote address (direct connection)
+        if not ip:
             ip = request.META.get("REMOTE_ADDR")
+
+        # Remove port number if present (e.g., "192.168.1.1:8080" -> "192.168.1.1")
+        if ip and ":" in ip:
+            # Handle IPv6 addresses properly (they have multiple colons)
+            if ip.count(":") == 1:
+                ip = ip.split(":")[0]
+
         return ip
 
 
@@ -566,11 +585,30 @@ class ProofOfLifeOTPVerifyView(APIView):
 
     def _get_client_ip(self, request):
         """Extract client IP address from request."""
+        # Try multiple headers in order of preference
+        ip = None
+
+        # X-Forwarded-For header (most common for load balancers)
         x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
         if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0]
-        else:
+            ip = x_forwarded_for.split(",")[0].strip()
+
+        # Client-IP header (sometimes used by proxies)
+        if not ip:
+            client_ip = request.META.get("HTTP_CLIENT_IP")
+            if client_ip:
+                ip = client_ip.strip()
+
+        # Remote address (direct connection)
+        if not ip:
             ip = request.META.get("REMOTE_ADDR")
+
+        # Remove port number if present (e.g., "192.168.1.1:8080" -> "192.168.1.1")
+        if ip and ":" in ip:
+            # Handle IPv6 addresses properly (they have multiple colons)
+            if ip.count(":") == 1:
+                ip = ip.split(":")[0]
+
         return ip
 
 
